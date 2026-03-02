@@ -8,6 +8,7 @@ router.get("/", validateToken, controller.getAllSales);       // admin
 router.get("/my", validateToken, controller.getMySales);     // Salesperson
 router.get("/:id", validateToken, controller.getSaleById);
 router.post("/:id/void", validateToken, controller.voidSale);
+router.post("/:id/revise", validateToken, controller.reviseSale);
 
 
 module.exports = router;

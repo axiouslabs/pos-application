@@ -136,7 +136,7 @@ exports.getProductPerformance = async (start, end, salespersonId = null) => {
     FROM sale_items si
    JOIN products p 
   ON p.id = si.product_id
- AND p.is_active = true
+ AND p.is_active = true 
     JOIN sales s ON s.id = si.sale_id
   WHERE s.sale_date >= $1
   AND s.sale_date < ($2::date + INTERVAL '1 day')

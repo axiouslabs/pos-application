@@ -137,9 +137,37 @@ exports.getSaleItems = async (client, saleId) => {
 
 // BASIC LIST
 
-exports.getAllSales = async (limit = 20) => {
-  const r = await db.query(
-    `
+// exports.getAllSales = async (limit = 20) => {
+//   const r = await db.query(
+//     `
+//     SELECT
+//       s.id,
+//       s.customer_id,
+//       s.subtotal_amount,
+//       s.discount_amount,
+//       s.vat_amount,
+//       s.vat_percentage,
+//       s.total_amount,
+//       s.payment_status,
+//       s.sale_status,        -- ✅ IMPORTANT
+//       s.sale_date,
+//       u.username AS salesperson_name,
+//       c.name AS customer_name,
+//       c.phone AS customer_phone
+//     FROM sales s
+//     LEFT JOIN users u ON u.id = s.salesperson_id
+//     LEFT JOIN customers c ON c.id = s.customer_id
+//     ORDER BY s.sale_date DESC
+//     LIMIT $1
+//     `,
+//     [limit]
+//   );
+
+//   return r.rows;
+// };
+
+exports.getAllSales = async ({ from, to, salesperson, status }) => {
+  let query = `
     SELECT
       s.id,
       s.customer_id,
@@ -149,7 +177,7 @@ exports.getAllSales = async (limit = 20) => {
       s.vat_percentage,
       s.total_amount,
       s.payment_status,
-      s.sale_status,        -- ✅ IMPORTANT
+      s.sale_status,
       s.sale_date,
       u.username AS salesperson_name,
       c.name AS customer_name,
@@ -157,12 +185,42 @@ exports.getAllSales = async (limit = 20) => {
     FROM sales s
     LEFT JOIN users u ON u.id = s.salesperson_id
     LEFT JOIN customers c ON c.id = s.customer_id
-    ORDER BY s.sale_date DESC
-    LIMIT $1
-    `,
-    [limit]
-  );
+    WHERE 1=1
+  `;
 
+  const values = [];
+  let index = 1;
+
+ if (from && to) {
+  query += ` AND s.sale_date >= $${index} AND s.sale_date < $${index + 1}::date + INTERVAL '1 day'`;
+  values.push(from, to);
+  index += 2;
+}
+
+  if (salesperson) {
+    query += ` AND u.username = $${index}`;
+    values.push(salesperson);
+    index++;
+  }
+
+  if (status) {
+    if (status === "CANCELLED") {
+      query += ` AND s.sale_status = 'voided'`;
+    } else {
+      query += ` AND s.payment_status = $${index}`;
+      values.push(status.toLowerCase());
+      index++;
+    }
+  }
+
+  query += ` ORDER BY s.sale_date DESC`;
+
+  // Default limit only if NO filter is applied
+  if (!from && !to && !salesperson && !status) {
+    query += ` LIMIT 20`;
+  }
+
+  const r = await db.query(query, values);
   return r.rows;
 };
 

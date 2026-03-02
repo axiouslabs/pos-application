@@ -59,15 +59,37 @@ class SalesNotifier extends Notifier<SalesState> {
   }
 
   // ADMIN
-  Future<void> fetchAdminSales() async {
-    state = state.copyWith(isLoading: true);
-    try {
-      final list = await ref.read(salesRepositoryProvider).getAdminSales();
-      state = state.copyWith(isLoading: false, sales: list);
-    } catch (e) {
-      state = state.copyWith(isLoading: false, error: e.toString());
-    }
+  // Future<void> fetchAdminSales() async {
+  //   state = state.copyWith(isLoading: true);
+  //   try {
+  //     final list = await ref.read(salesRepositoryProvider).getAdminSales();
+  //     state = state.copyWith(isLoading: false, sales: list);
+  //   } catch (e) {
+  //     state = state.copyWith(isLoading: false, error: e.toString());
+  //   }
+  // }
+
+  Future<void> fetchAdminSales({
+  String? from,
+  String? to,
+  String? salesperson,
+  String? status,
+}) async {
+  state = state.copyWith(isLoading: true);
+
+  try {
+    final list = await ref.read(salesRepositoryProvider).getAdminSales(
+      from: from,
+      to: to,
+      salesperson: salesperson,
+      status: status,
+    );
+
+    state = state.copyWith(isLoading: false, sales: list);
+  } catch (e) {
+    state = state.copyWith(isLoading: false, error: e.toString());
   }
+}
 
   // USER (already correct)
   Future<void> fetchMySales() async {
@@ -80,38 +102,62 @@ class SalesNotifier extends Notifier<SalesState> {
     }
   }
 
-    Future<void> voidSale(int saleId) async {
+  //   Future<void> voidSale(int saleId) async {
+  //   try {
+  //     await ref.read(salesRepositoryProvider).voidSale(saleId);
+  //     await fetchAdminSales(); // refresh list after cancel
+  //   } catch (e) {
+  //     state = state.copyWith(error: e.toString());
+  //     rethrow;
+  //   }
+  // }
+
+  Future<void> voidSale(int saleId) async {
     try {
       await ref.read(salesRepositoryProvider).voidSale(saleId);
-      await fetchAdminSales(); // refresh list after cancel
+
+      // ✅ Refresh BOTH datasets
+      await fetchAdminSales();
+      await fetchMySales();
     } catch (e) {
       state = state.copyWith(error: e.toString());
       rethrow;
     }
   }
 
-  // Future<void> voidSale(int saleId) async {
-  //   state = state.copyWith(isLoading: true, error: null);
-
-  //   try {
-  //     await ref.read(salesRepositoryProvider).voidSale(saleId);
-
-  //     // refresh list after cancel
-  //     await fetchAdminSales();
-
-  //     state = state.copyWith(isLoading: false);
-  //   } catch (e) {
-  //     state = state.copyWith(isLoading: false, error: e.toString());
-  //     rethrow;
-  //   }
-  // }
-
-
-  
-
   Future<void> refreshAdminSales() async {
     await fetchAdminSales();
   }
+
+  Future<int> reviseSale({
+  required int originalSaleId,
+  required int customerId,
+  required List<Map<String, dynamic>> items,
+  required String paymentMethod,
+  required String paymentStatus,
+  required double discountAmount,
+}) async {
+  state = state.copyWith(isLoading: true);
+
+  try {
+    final repo = ref.read(salesRepositoryProvider);
+
+    final newSaleId = await repo.reviseSale(
+      originalSaleId: originalSaleId,
+      customerId: customerId,
+      items: items,
+      paymentMethod: paymentMethod,
+      paymentStatus: paymentStatus,
+      discountAmount: discountAmount,
+    );
+
+    state = state.copyWith(isLoading: false);
+    return newSaleId;
+  } catch (e) {
+    state = state.copyWith(isLoading: false, error: e.toString());
+    rethrow;
+  }
+}
 }
 
 final salesNotifierProvider = NotifierProvider<SalesNotifier, SalesState>(

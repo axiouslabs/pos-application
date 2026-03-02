@@ -58,9 +58,11 @@ class AdminTransactionHistoryPage extends HookConsumerWidget {
                 ),
               );
 
-              if (result != null) {
-                filter.value = result;
-              }
+              // if (result != null) {
+              //   filter.value = result;
+              // }
+
+              filter.value = result; // allow null also
             },
 
             icon: Icon(Icons.tune, color: primaryBlue, size: 20),
@@ -92,7 +94,19 @@ class AdminTransactionHistoryPage extends HookConsumerWidget {
     List<Sale> sales,
     TransactionFilterResult? filter,
   ) {
+    // var filteredSales = List<Sale>.from(sales);
     var filteredSales = List<Sale>.from(sales);
+
+// ✅ DEFAULT: Show only today's sales if no filter applied
+if (filter == null) {
+  final now = DateTime.now();
+
+  filteredSales = filteredSales.where((sale) {
+    return sale.saleDate.year == now.year &&
+           sale.saleDate.month == now.month &&
+           sale.saleDate.day == now.day;
+  }).toList();
+}
 
     if (filter != null) {
       // Salesperson filter

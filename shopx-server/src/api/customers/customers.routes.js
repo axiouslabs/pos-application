@@ -18,10 +18,13 @@ router.get("/my", validateToken, controller.getMyCustomers);
 router.get("/:id", validateToken, controller.getCustomerById);
 
 
-// Update customer
-router.put("/:id", validateToken, checkAdmin, controller.updateCustomer);
+// // Update customer
+// router.put("/:id", validateToken, checkAdmin, controller.updateCustomer);
 
-// Delete customer (admin only)
-router.delete("/:id", validateToken, checkAdmin, controller.deleteCustomer);
+// // Delete customer (admin only)
+// router.delete("/:id", validateToken, checkAdmin, controller.deleteCustomer);
+
+router.put("/:id", validateToken, controller.updateCustomer);
+router.delete("/:id", validateToken, controller.deleteCustomer);
 
 module.exports = router;

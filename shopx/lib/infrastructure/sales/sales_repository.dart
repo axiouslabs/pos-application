@@ -76,10 +76,28 @@ class SalesRepository {
   }
 
   // ADMIN
-  Future<List<Sale>> getAdminSales() async {
-    final list = await api.getAdminSales();
-    return list.map((e) => Sale.fromJson(e)).toList();
-  }
+  // Future<List<Sale>> getAdminSales() async {
+  //   final list = await api.getAdminSales();
+  //   return list.map((e) => Sale.fromJson(e)).toList();
+  // }
+
+  Future<List<Sale>> getAdminSales({
+  String? from,
+  String? to,
+  String? salesperson,
+  String? status,
+}) async {
+  final list = await api.getAdminSales(
+    from: from,
+    to: to,
+    salesperson: salesperson,
+    status: status,
+  );
+
+  return list.map((e) => Sale.fromJson(e)).toList();
+}
+
+
 
   // USER
   Future<List<Sale>> getMySales() async {
@@ -90,6 +108,34 @@ class SalesRepository {
   Future<void> voidSale(int saleId) async {
     await api.voidSale(saleId);
   }
+
+  Future<int> reviseSale({
+  required int originalSaleId,
+  required int customerId,
+  required List<Map<String, dynamic>> items,
+  required String paymentMethod,
+  required String paymentStatus,
+  required double discountAmount,
+}) async {
+  final response = await api.reviseSale(
+    originalSaleId,
+    {
+      "customer_id": customerId,
+      "items": items,
+      "payment_method": paymentMethod,
+      "payment_status": paymentStatus,
+      "discount_amount": discountAmount,
+    },
+  );
+
+  final newSale = response["result"];
+
+  if (newSale == null || newSale["id"] == null) {
+    throw Exception("Revised sale ID missing");
+  }
+
+  return newSale["id"];
+}
 }
 
 // ----------------------------------------------------------

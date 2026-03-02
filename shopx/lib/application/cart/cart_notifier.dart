@@ -52,6 +52,42 @@ class CartNotifier extends Notifier<CartState> {
   void clearCart() {
     state = state.copyWith(items: []);
   }
+
+
+  // ================= REVISION SUPPORT =================
+// Used when editing an existing sale
+void addFromRevision({
+  required String productId,
+  required String productName,
+  required double quantity,
+  required double unitPrice,
+}) {
+  final list = [...state.items];
+
+  // Create lightweight product object
+  final product = Product(
+    id: productId,
+    name: productName,
+    nameAr: productName,
+    price: unitPrice,
+    category: "",
+    quantity: 0,
+    images: const [],
+    code: "",
+    vat: 15,
+  );
+
+  list.add(
+    CartItem(
+      product: product,
+      quantity: quantity,
+      sellingPrice: unitPrice,
+    ),
+  );
+
+  state = state.copyWith(items: list);
+}
+
 }
 
 final cartProvider = NotifierProvider<CartNotifier, CartState>(

@@ -4,7 +4,6 @@ import 'package:shopx/application/payments/payments_state.dart';
 import 'package:shopx/application/sales/sales_notifier.dart';
 import 'package:shopx/infrastructure/payments/payment_repository.dart';
 
-
 class PaymentsNotifier extends Notifier<PaymentsState> {
   @override
   PaymentsState build() => const PaymentsState();
@@ -15,24 +14,29 @@ class PaymentsNotifier extends Notifier<PaymentsState> {
 
     try {
       final repo = ref.read(paymentsRepositoryProvider);
+
+      //   await repo.markPaymentAsPaid(saleId);
+
+      //     // 🔥 FORCE DASHBOARD + TRANSACTIONS TO REFRESH
+      // ref.invalidate(adminDashboardNotifierProvider);
+      // ref.invalidate(salesNotifierProvider);
+
       await repo.markPaymentAsPaid(saleId);
 
-        // 🔥 FORCE DASHBOARD + TRANSACTIONS TO REFRESH
-    ref.invalidate(adminDashboardNotifierProvider);
-    ref.invalidate(salesNotifierProvider);
-    
+      // ✅ Refresh sales properly
+      await ref.read(salesNotifierProvider.notifier).fetchAdminSales();
+      await ref.read(salesNotifierProvider.notifier).fetchMySales();
+
+      // Optional: refresh dashboard
+      ref.invalidate(adminDashboardNotifierProvider);
+
       state = state.copyWith(isLoading: false);
     } catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        error: e.toString(),
-      );
+      state = state.copyWith(isLoading: false, error: e.toString());
       rethrow;
     }
   }
 }
 
 final paymentsNotifierProvider =
-    NotifierProvider<PaymentsNotifier, PaymentsState>(
-  PaymentsNotifier.new,
-);
+    NotifierProvider<PaymentsNotifier, PaymentsState>(PaymentsNotifier.new);

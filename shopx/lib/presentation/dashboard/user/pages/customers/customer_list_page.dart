@@ -12,34 +12,28 @@ class CustomerListPage extends HookConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final authState = ref.watch(authNotifierProvider);
-final loggedInSalespersonId = authState.user?.id;
+    final loggedInSalespersonId = authState.user?.id;
 
     // 1. Fetch Customers on Load
-  useEffect(() {
-  Future.microtask(() {
-    // 🔒 Manage Customers → ONLY my customers
-    ref.read(customerNotifierProvider.notifier).fetchMyCustomers();
-  });
-  return null;
-}, []);
-
+    useEffect(() {
+      Future.microtask(() {
+        // 🔒 Manage Customers → ONLY my customers
+        ref.read(customerNotifierProvider.notifier).fetchMyCustomers();
+      });
+      return null;
+    }, []);
 
     final searchQuery = useState('');
-
+    final expandedCustomerId = useState<int?>(null);
 
     // 2. Watch State
     final customerState = ref.watch(customerNotifierProvider);
     final customers = customerState.customers;
 
-  final filteredCustomers = customers.where((customer) {
-  final query = searchQuery.value.toLowerCase();
-  return customer.name.toLowerCase().contains(query);
-}).toList();
-
-
-
-
-
+    final filteredCustomers = customers.where((customer) {
+      final query = searchQuery.value.toLowerCase();
+      return customer.name.toLowerCase().contains(query);
+    }).toList();
 
     // UI Constants
     const primaryBlue = Color(0xFF1976D2);
@@ -57,7 +51,11 @@ final loggedInSalespersonId = authState.user?.id;
                 children: [
                   GestureDetector(
                     onTap: () => Navigator.pop(context),
-                    child: const Icon(Icons.arrow_back_ios, size: 20, color: primaryBlue),
+                    child: const Icon(
+                      Icons.arrow_back_ios,
+                      size: 20,
+                      color: primaryBlue,
+                    ),
                   ),
                   const Expanded(
                     child: Text(
@@ -75,40 +73,46 @@ final loggedInSalespersonId = authState.user?.id;
               ),
             ),
 
-           // --- SEARCH BAR (Visual Only) ---
-  Padding(
-  padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 8.0),
-  child: Container(
-    decoration: BoxDecoration(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(12),
-      border: Border.all(color: Colors.grey.shade300),
-    ),
-    child: TextField(
-      onChanged: (value) {
-        searchQuery.value = value;
-      },
-      decoration: const InputDecoration(
-        hintText: "Search for a name",
-        hintStyle: TextStyle(color: Colors.grey, fontSize: 13),
-        border: InputBorder.none,
-        contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        suffixIcon: Icon(Icons.search, color: Color(0xFF1F2937)),
-      ),
-    ),
-  ),
-),
+            // --- SEARCH BAR (Visual Only) ---
+            Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 24.0,
+                vertical: 8.0,
+              ),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey.shade300),
+                ),
+                child: TextField(
+                  onChanged: (value) {
+                    searchQuery.value = value;
+                  },
+                  decoration: const InputDecoration(
+                    hintText: "Search for a name",
+                    hintStyle: TextStyle(color: Colors.grey, fontSize: 13),
+                    border: InputBorder.none,
+                    contentPadding: EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 14,
+                    ),
+                    suffixIcon: Icon(Icons.search, color: Color(0xFF1F2937)),
+                  ),
+                ),
+              ),
+            ),
 
-
-
-           kHeight10,
+            kHeight10,
 
             // --- CUSTOMER LIST ---
             Expanded(
               child: Builder(
                 builder: (context) {
                   if (customerState.isLoading) {
-                    return const Center(child: CircularProgressIndicator(color: primaryBlue));
+                    return const Center(
+                      child: CircularProgressIndicator(color: primaryBlue),
+                    );
                   }
 
                   if (customerState.error != null) {
@@ -120,27 +124,203 @@ final loggedInSalespersonId = authState.user?.id;
                   }
 
                   return ListView.separated(
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-                   itemCount: filteredCustomers.length,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 8,
+                    ),
+                    itemCount: filteredCustomers.length,
                     separatorBuilder: (ctx, i) => const Divider(height: 1),
                     itemBuilder: (context, index) {
                       final customer = filteredCustomers[index];
-                      return Container(
-                        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
-                        color: Colors.white, // Background per item for clean look
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              customer.name,
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w500,
-                                color: Color(0xFF1F2937),
+
+                      // return Container(
+                      //   padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
+                      //   color: Colors.white, // Background per item for clean look
+                      //   child: Row(
+                      //     mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      //     children: [
+                      //       Text(
+                      //         customer.name,
+                      //         style: const TextStyle(
+                      //           fontSize: 16,
+                      //           fontWeight: FontWeight.w500,
+                      //           color: Color(0xFF1F2937),
+                      //         ),
+                      //       ),
+                      //       const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.black54),
+                      //     ],
+                      //   ),
+                      // );
+                      final isExpanded =
+                          expandedCustomerId.value == customer.id;
+
+                      return GestureDetector(
+                        onTap: () {
+                          expandedCustomerId.value =
+                              expandedCustomerId.value == customer.id
+                              ? null
+                              : customer.id;
+                        },
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 250),
+                          margin: const EdgeInsets.only(bottom: 12),
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.05),
+                                blurRadius: 8,
+                                offset: const Offset(0, 4),
                               ),
-                            ),
-                            const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.black54),
-                          ],
+                            ],
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    customer.name,
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF1F2937),
+                                    ),
+                                  ),
+                                if (!isExpanded)
+  const Icon(Icons.chevron_right, color: Colors.black54),
+                                ],
+                              ),
+
+                              if (isExpanded) ...[
+                                const SizedBox(height: 10),
+                                Text("Phone: ${customer.phone ?? "-"}"),
+                                Text("TIN: ${customer.tin ?? "-"}"),
+                             Text("Area: ${customer.area ?? "-"}"),
+
+if (customer.salespersonName != null &&
+    customer.salespersonName!.isNotEmpty)
+  Text(
+    "Salesperson: ${customer.salespersonName}",
+    style: const TextStyle(color: Colors.grey),
+  )
+else
+  const Text(
+    "Salesperson: -",
+    style: TextStyle(color: Colors.grey),
+  ),
+
+                                const SizedBox(height: 16),
+
+                                Row(
+                                  children: [
+                                    // MODIFY BUTTON
+                                    Expanded(
+                                      child: ElevatedButton(
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: primaryBlue,
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              12,
+                                            ),
+                                          ),
+                                        ),
+                                        onPressed: () async {
+                                          await Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder: (_) => AddCustomerPage(
+                                                customer: customer,
+                                              ),
+                                            ),
+                                          );
+
+                                          ref
+                                              .read(
+                                                customerNotifierProvider
+                                                    .notifier,
+                                              )
+                                              .fetchMyCustomers();
+                                        },
+                                        child: const Text("Modify"),
+                                      ),
+                                    ),
+
+                                    const SizedBox(width: 12),
+
+                                    // DELETE BUTTON
+                                    Expanded(
+                                      child: ElevatedButton(
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.red,
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              12,
+                                            ),
+                                          ),
+                                        ),
+                                       onPressed: () async {
+  final shouldDelete = await showDialog<bool>(
+    context: context,
+    builder: (context) {
+      return AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        content: const Text(
+          "Do you want to delete?",
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        actionsAlignment: MainAxisAlignment.spaceEvenly,
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text(
+              "NO",
+              style: TextStyle(
+                fontSize: 16,
+                color: Colors.grey,
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text(
+              "YES",
+              style: TextStyle(
+                fontSize: 16,
+                color: Colors.red,
+              ),
+            ),
+          ),
+        ],
+      );
+    },
+  );
+
+  if (shouldDelete == true) {
+    await ref
+        .read(customerNotifierProvider.notifier)
+        .deleteCustomer(customer.id);
+  }
+},
+                                        child: const Text("Delete"),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ],
+                          ),
                         ),
                       );
                     },
@@ -161,10 +341,14 @@ final loggedInSalespersonId = authState.user?.id;
                     // Navigate to Add Page
                     await Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (context) => const AddCustomerPage()),
+                      MaterialPageRoute(
+                        builder: (context) => const AddCustomerPage(),
+                      ),
                     );
                     // Refresh list on return
-                    ref.read(customerNotifierProvider.notifier).fetchMyCustomers();
+                    ref
+                        .read(customerNotifierProvider.notifier)
+                        .fetchMyCustomers();
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: primaryBlue,

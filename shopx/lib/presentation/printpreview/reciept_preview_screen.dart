@@ -24,9 +24,19 @@ class RecieptPreviewScreen extends HookConsumerWidget {
 
   RecieptPreviewScreen({super.key, required this.receipt});
 
+  // String formatInvoiceDate(DateTime date) {
+  //   return DateFormat('yyyy-MM-dd hh:mm a').format(date);
+  // }
+
   String formatInvoiceDate(DateTime date) {
-    return DateFormat('yyyy-MM-dd hh:mm a').format(date);
-  }
+  // Ensure UTC first
+  final utcDate = date.toUtc();
+
+  // Dubai is UTC +4
+  final dubaiTime = utcDate.add(const Duration(hours: 4));
+
+  return DateFormat('yyyy-MM-dd hh:mm a').format(dubaiTime);
+}
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {

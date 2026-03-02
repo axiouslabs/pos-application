@@ -8,6 +8,7 @@ import 'package:shopx/core/constants.dart';
 import 'package:shopx/domain/reciept/reciept_from_sale.dart';
 import 'package:shopx/domain/sales/sale.dart';
 import 'package:shopx/infrastructure/pdf/pdf_receipt_service.dart';
+import 'package:shopx/presentation/cart/cart_screen.dart';
 import 'package:shopx/presentation/printpreview/reciept_preview_screen.dart';
 
 class TransactionDetailsDialog extends HookConsumerWidget {
@@ -230,16 +231,61 @@ SizedBox(
 ),
 
 
-                kHeight16,
+kHeight16,
 
-                // if (_isPending) _markAsPaidButton(context),
-                if (!_isVoided && _isPending)
-                  _markAsPaidButton(context, isSubmitting),
+// ================= EDIT SALE =================
+if (!_isVoided)
+  SizedBox(
+    width: double.infinity,
+    child: ElevatedButton(
+      style: ElevatedButton.styleFrom(
+        backgroundColor: Colors.blueGrey,
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+      ),
+      child: const Text(
+        "Edit Sale",
+        style: TextStyle(
+          fontWeight: FontWeight.bold,
+          color: Colors.white,
+        ),
+      ),
+      onPressed: () {
+        Navigator.of(context).pop(); // close dialog
 
-                kHeight20,
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => CartScreen(saleToEdit: sale),
+          ),
+        );
+      },
+    ),
+  ),
 
-                if (!_isVoided && onCancelSale != null)
-                  _cancelSaleButton(context, isSubmitting),
+kHeight16,
+
+if (!_isVoided && _isPending)
+  _markAsPaidButton(context, isSubmitting),
+
+kHeight20,
+
+if (!_isVoided && onCancelSale != null)
+  _cancelSaleButton(context, isSubmitting),
+
+                // kHeight16,
+
+                // // if (_isPending) _markAsPaidButton(context),
+                // if (!_isVoided && _isPending)
+                //   _markAsPaidButton(context, isSubmitting),
+                  
+
+                // kHeight20,
+
+                // if (!_isVoided && onCancelSale != null)
+                //   _cancelSaleButton(context, isSubmitting),
 
                 if (_isVoided)
                   const Text(

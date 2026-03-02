@@ -93,7 +93,7 @@ exports.createSale = async (data) => {
       // ✅ FETCH PRODUCT NAMES (English + Arabic)
       const productRes = await client.query(
         `SELECT name, name_ar FROM products WHERE id = $1`,
-        [item.product_id]
+        [item.product_id],
       );
 
       const product = productRes.rows[0];
@@ -122,7 +122,7 @@ exports.createSale = async (data) => {
           item.unit_price,
           item.discount || 0,
           item.quantity * (item.unit_price - (item.discount || 0)),
-        ]
+        ],
       );
 
       // Deduct FULL sold quantity (allow negative stock)
@@ -188,7 +188,7 @@ exports.voidSale = async (saleId, user) => {
     // 🔒 Lock row to prevent double void (CRITICAL)
     const saleRes = await client.query(
       `SELECT * FROM sales WHERE id = $1 FOR UPDATE`,
-      [saleId]
+      [saleId],
     );
 
     const sale = saleRes.rows[0];
@@ -208,7 +208,7 @@ exports.voidSale = async (saleId, user) => {
       await stockService.adjustStock(
         item.product_id,
         item.quantity,
-        "sale_void"
+        "sale_void",
       );
     }
 
@@ -234,10 +234,181 @@ exports.voidSale = async (saleId, user) => {
 exports.getFullInvoice = async (id) => {
   return await repo.getFullInvoice(id);
 };
-exports.getAllSales = async () => {
-  return await repo.getAllSales();
+
+// exports.getAllSales = async () => {
+//   return await repo.getAllSales();
+// };
+
+exports.getAllSales = async (filters) => {
+  return await repo.getAllSales(filters);
 };
 
 exports.getSalesBySalesperson = async (salespersonId) => {
   return await repo.getSalesBySalesperson(salespersonId);
+};
+
+exports.reviseSale = async (saleId, updatedData, user) => {
+  const client = await db.connect();
+
+  try {
+    await client.query("BEGIN");
+
+    // 1️⃣ Lock original sale
+    const originalSaleRes = await client.query(
+      `SELECT * FROM sales WHERE id = $1 FOR UPDATE`,
+      [saleId],
+    );
+
+    if (originalSaleRes.rows.length === 0) {
+      throw new Error("Original sale not found");
+    }
+
+    const originalSale = originalSaleRes.rows[0];
+
+    if (originalSale.sale_status === "voided") {
+      throw new Error("Cannot revise a voided sale");
+    }
+
+    // 🔒 Prevent double revision
+    if (originalSale.sale_type === "revised") {
+      throw new Error("Sale already revised");
+    }
+
+    // 2️⃣ Reverse stock
+    const originalItems = await repo.getSaleItems(client, saleId);
+
+    for (const item of originalItems) {
+      await stockService.adjustStock(
+        item.product_id,
+        item.quantity,
+        "sale_revision_reverse",
+      );
+    }
+
+    // Reverse payment if original was paid
+    if (originalSale.payment_status === "paid") {
+      await paymentsRepo.reversePaymentBySaleId(client, saleId);
+    }
+
+    // 3️⃣ Mark original sale as revised
+    await client.query(`UPDATE sales SET sale_type = 'revised' WHERE id = $1`, [
+      saleId,
+    ]);
+
+    // 4️⃣ Recalculate new sale amounts
+    const VAT_PERCENTAGE = 15;
+
+    let grossSubtotal = 0;
+    updatedData.items.forEach((i) => {
+      grossSubtotal += i.quantity * i.unit_price;
+    });
+
+    const discountAmount = Number(updatedData.discount_amount || 0);
+
+    const vatAmount = +(grossSubtotal * (VAT_PERCENTAGE / 100)).toFixed(2);
+
+    const totalAmount = +(grossSubtotal + vatAmount - discountAmount).toFixed(
+      2,
+    );
+
+    // 5️⃣ Insert new sale (REVISION)
+    const newSaleRes = await client.query(
+      `
+      INSERT INTO sales
+      (
+        salesperson_id,
+        customer_id,
+        subtotal_amount,
+        discount_amount,
+        vat_percentage,
+        vat_amount,
+        total_amount,
+        payment_method,
+        payment_status,
+        original_sale_id,
+        sale_type
+      )
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'revision')
+      RETURNING *
+      `,
+      [
+        originalSale.salesperson_id,
+        updatedData.customer_id,
+        grossSubtotal,
+        discountAmount,
+        VAT_PERCENTAGE,
+        vatAmount,
+        totalAmount,
+        updatedData.payment_method,
+        updatedData.payment_status,
+        saleId,
+      ],
+    );
+
+    const newSale = newSaleRes.rows[0];
+
+    // 6️⃣ Insert new sale items
+    for (const item of updatedData.items) {
+      const productRes = await client.query(
+        `SELECT name, name_ar FROM products WHERE id = $1`,
+        [item.product_id],
+      );
+
+      const product = productRes.rows[0];
+
+      await client.query(
+        `
+        INSERT INTO sale_items
+        (
+          sale_id,
+          product_id,
+          product_name,
+          product_name_ar,
+          quantity,
+          fulfilled_quantity,
+          unit_price,
+          discount,
+          total_price
+        )
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+        `,
+        [
+          newSale.id,
+          item.product_id,
+          product.name,
+          product.name_ar,
+          item.quantity,
+          item.quantity,
+          item.unit_price,
+          item.discount || 0,
+          item.quantity * (item.unit_price - (item.discount || 0)),
+        ],
+      );
+
+      await stockService.adjustStock(
+        item.product_id,
+        -item.quantity,
+        "sale_revision_new",
+      );
+    }
+
+    // Create payment for revised sale if paid
+    if (updatedData.payment_status === "paid") {
+      await paymentsRepo.createPayment(client, {
+        saleId: newSale.id,
+        customerId: updatedData.customer_id,
+        amount: totalAmount,
+        method: updatedData.payment_method || "cash",
+        status: "paid",
+      });
+    }
+
+    await client.query("COMMIT");
+    return newSale;
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
 };

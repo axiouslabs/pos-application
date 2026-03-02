@@ -7,11 +7,17 @@ import 'package:shopx/application/sales/sales_notifier.dart';
 import 'package:shopx/application/stock/stock_notifier.dart';
 import 'package:shopx/domain/customers/customer.dart';
 import 'package:shopx/domain/products/product.dart';
+import 'package:shopx/domain/sales/sale.dart';
 import 'package:shopx/presentation/cart/cart_success_screen.dart'; // Ensure this path matches your project
 
-class CartScreen extends HookConsumerWidget {
-  const CartScreen({super.key});
 
+class CartScreen extends HookConsumerWidget {
+  final Sale? saleToEdit;
+
+  const CartScreen({
+    super.key,
+    this.saleToEdit,
+  });
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     // 1. Watch Cart State
@@ -23,16 +29,9 @@ class CartScreen extends HookConsumerWidget {
 
     final selectedCustomer = useState<Customer?>(null);
 
-    //storing selected
 
-    // useEffect(() {
-    //   Future.microtask(() {
-    //     // 🧾 Cart needs ALL customers
-    //     ref.read(customerNotifierProvider.notifier).fetchAllCustomers();
-    //   });
-    //   return null;
-    // }, []);
 
+    
     useEffect(() {
       Future.microtask(() {
         final customerState = ref.read(customerNotifierProvider);
@@ -77,6 +76,74 @@ class CartScreen extends HookConsumerWidget {
       0,
       (sum, item) => sum + (item.sellingPrice * item.quantity),
     );
+
+
+
+// ================= EDIT MODE PREFILL =================
+useEffect(() {
+  if (saleToEdit != null) {
+    Future.microtask(() {
+      final cartNotifier = ref.read(cartProvider.notifier);
+
+      cartNotifier.clearCart();
+
+      // Add sale items into cart
+      for (final item in saleToEdit!.items) {
+        final product = Product(
+          id: item.productId.toString(),
+          name: item.productName,
+          nameAr: item.productNameAr ?? "",
+          price: item.unitPrice,
+          category: "",
+          quantity: item.quantity.toDouble(),
+          code: "",
+          vat: 15,
+        );
+
+        cartNotifier.addToCart(product, item.quantity.toDouble());
+
+        if (product.price != item.unitPrice) {
+          cartNotifier.updateSellingPrice(product.id!, item.unitPrice);
+        }
+      }
+
+      // Prefill customer
+      selectedCustomer.value = Customer(
+        id: saleToEdit!.customerId,
+        name: saleToEdit!.customerName,
+        phone: saleToEdit!.customerPhone,
+        tin: saleToEdit!.customerTin,
+        address: "",
+        createdAt: DateTime.now(),
+      );
+
+      nameCtrl.text = saleToEdit!.customerName;
+      phoneCtrl.text = saleToEdit!.customerPhone ?? "";
+
+
+    // Prefill discount
+discountController.text =
+    saleToEdit!.discountAmount.toStringAsFixed(2);
+
+// Prefill payment method
+if (saleToEdit!.payments.isNotEmpty) {
+  paymentMethod.value = saleToEdit!.payments.first.method;
+} else {
+  paymentMethod.value = saleToEdit!.paymentStatus == "pending"
+      ? "pending"
+      : "cash";
+}
+
+// Prefill payment status
+paymentStatus.value = saleToEdit!.paymentStatus;
+
+    });
+  }
+
+  return null;
+}, []);
+
+
 
     // --- LOGIC: Place Order ---
     // void handlePlaceOrder() async {
@@ -136,15 +203,38 @@ class CartScreen extends HookConsumerWidget {
       try {
         print("🛒 Creating sale...");
 
-        final saleId = await ref
-            .read(salesNotifierProvider.notifier)
-            .createSale(
-              customerId: selectedCustomer.value?.id ?? 0,
-              items: saleItems,
-              paymentMethod: paymentMethod.value,
-              paymentStatus: paymentStatus.value, // 👈 NEW
-              discountAmount: discountAmount.value,
-            );
+        // final saleId = await ref
+        //     .read(salesNotifierProvider.notifier)
+        //     .createSale(
+        //       customerId: selectedCustomer.value?.id ?? 0,
+        //       items: saleItems,
+        //       paymentMethod: paymentMethod.value,
+        //       paymentStatus: paymentStatus.value, // 👈 NEW
+        //       discountAmount: discountAmount.value,
+        //     );
+
+        final notifier = ref.read(salesNotifierProvider.notifier);
+
+int saleId;
+
+if (saleToEdit == null) {
+  saleId = await notifier.createSale(
+    customerId: selectedCustomer.value?.id ?? 0,
+    items: saleItems,
+    paymentMethod: paymentMethod.value,
+    paymentStatus: paymentStatus.value,
+    discountAmount: discountAmount.value,
+  );
+} else {
+  saleId = await notifier.reviseSale(
+    originalSaleId: saleToEdit!.id,
+    customerId: selectedCustomer.value?.id ?? 0,
+    items: saleItems,
+    paymentMethod: paymentMethod.value,
+    paymentStatus: paymentStatus.value,
+    discountAmount: discountAmount.value,
+  );
+}
 
         // OPTIONAL INFO MESSAGE (correct place)
         if (hasBackorder) {
@@ -691,14 +781,14 @@ class CartScreen extends HookConsumerWidget {
           color: Colors.white,
         ),
       )
-    : const Text(
-        "Place order",
-        style: TextStyle(
-          color: Colors.white,
-          fontWeight: FontWeight.bold,
-          fontSize: 16,
-        ),
-      ),
+   : Text(
+    saleToEdit == null ? "Place Order" : "Update Sale",
+    style: const TextStyle(
+      color: Colors.white,
+      fontWeight: FontWeight.bold,
+      fontSize: 16,
+    ),
+  ),
           ),
         ),
       ),

@@ -5,17 +5,34 @@ import 'package:shopx/application/customers/customer_notifier.dart';
 import 'package:shopx/domain/customers/customer.dart';
 import 'package:shopx/widget/customers/build_input_group.dart';
 
+// class AddCustomerPage extends HookConsumerWidget {
+//   const AddCustomerPage({super.key});
+
 class AddCustomerPage extends HookConsumerWidget {
-  const AddCustomerPage({super.key});
+  final Customer? customer;
+
+  const AddCustomerPage({super.key, this.customer});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     // 1. Controllers
-    final nameController = useTextEditingController();
-    final phoneController = useTextEditingController();
-    final tinController = useTextEditingController();
-    final addressController = useTextEditingController();
-    final areaController = useTextEditingController(); // ✅ NEW
+    // final nameController = useTextEditingController();
+    // final phoneController = useTextEditingController();
+    // final tinController = useTextEditingController();
+    // final addressController = useTextEditingController();
+    // final areaController = useTextEditingController(); // ✅ NEW
+
+    final isEditMode = customer != null;
+
+    final nameController = useTextEditingController(text: customer?.name ?? "");
+    final phoneController = useTextEditingController(
+      text: customer?.phone ?? "",
+    );
+    final tinController = useTextEditingController(text: customer?.tin ?? "");
+    final addressController = useTextEditingController(
+      text: customer?.address ?? "",
+    );
+    final areaController = useTextEditingController(text: customer?.area ?? "");
 
     final nameError = useState<String?>(null);
     final phoneError = useState<String?>(null);
@@ -76,8 +93,13 @@ class AddCustomerPage extends HookConsumerWidget {
       // SUCCESS MESSAGE
       if (next.success && previous?.success != true) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Customer added successfully!"),
+           SnackBar(
+            // content: Text("Customer added successfully!"),
+            content: Text(
+              isEditMode
+                  ? "Customer updated successfully!"
+                  : "Customer added successfully!",
+            ),
             backgroundColor: Colors.green,
             duration: Duration(seconds: 2),
           ),
@@ -120,9 +142,9 @@ class AddCustomerPage extends HookConsumerWidget {
                       color: primaryBlue,
                     ),
                   ),
-                  const Expanded(
+                  Expanded(
                     child: Text(
-                      "Adding a customer",
+                      isEditMode ? "Edit Customer" : "Adding a customer",
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 20,
@@ -160,7 +182,7 @@ class AddCustomerPage extends HookConsumerWidget {
                     ),
 
                     buildInputGroup(
-                     "TIN / Tax ID (Optional)",
+                      "TIN / Tax ID (Optional)",
                       tinController,
                       validateForm,
                       errorText: tinError.value,
@@ -193,9 +215,30 @@ class AddCustomerPage extends HookConsumerWidget {
                 child: ElevatedButton(
                   onPressed: (isFormValid.value && !customerState.isLoading)
                       ? () async {
-                          // Create Customer Object
-                          final newCustomer = Customer(
-                            id: 0,
+                          // // Create Customer Object
+                          // final newCustomer = Customer(
+                          //   id: 0,
+                          //   name: nameController.text,
+                          //   phone: phoneController.text.isEmpty
+                          //       ? null
+                          //       : phoneController.text,
+                          //   tin: tinController.text.isEmpty
+                          //       ? null
+                          //       : tinController.text,
+                          //   address: addressController.text,
+                          //   area: areaController.text.isEmpty
+                          //       ? null
+                          //       : areaController.text, // ✅ NEW
+                          //   createdAt: DateTime.now(),
+                          // );
+
+                          // Call Provider
+                          // await ref
+                          //     .read(customerNotifierProvider.notifier)
+                          //     .createCustomer(newCustomer);
+
+                          final updatedCustomer = Customer(
+                            id: isEditMode ? customer!.id : 0,
                             name: nameController.text,
                             phone: phoneController.text.isEmpty
                                 ? null
@@ -206,14 +249,21 @@ class AddCustomerPage extends HookConsumerWidget {
                             address: addressController.text,
                             area: areaController.text.isEmpty
                                 ? null
-                                : areaController.text, // ✅ NEW
-                            createdAt: DateTime.now(),
+                                : areaController.text,
+                            createdAt: isEditMode
+                                ? customer!.createdAt
+                                : DateTime.now(),
                           );
 
-                          // Call Provider
-                          await ref
-                              .read(customerNotifierProvider.notifier)
-                              .createCustomer(newCustomer);
+                          if (isEditMode) {
+                            await ref
+                                .read(customerNotifierProvider.notifier)
+                                .updateCustomer(customer!.id, updatedCustomer);
+                          } else {
+                            await ref
+                                .read(customerNotifierProvider.notifier)
+                                .createCustomer(updatedCustomer);
+                          }
                         }
                       : null, // Disabled if form invalid
                   style: ElevatedButton.styleFrom(
@@ -230,8 +280,8 @@ class AddCustomerPage extends HookConsumerWidget {
                   ),
                   child: customerState.isLoading
                       ? const CircularProgressIndicator(color: Colors.white)
-                      : const Text(
-                          "To safeguard", // Matches design text
+                      : Text(
+                          isEditMode ? "Save changes" : "Save customer",
                           style: TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.bold,

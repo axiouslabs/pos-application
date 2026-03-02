@@ -187,33 +187,86 @@ class _TransactionFilterDialogState extends State<TransactionFilterDialog> {
 
   // ================= ACTIONS =================
 
-  Widget _actions(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: OutlinedButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("Cancel"),
+  // Widget _actions(BuildContext context) {
+  //   return Row(
+  //     children: [
+  //       Expanded(
+  //         child: OutlinedButton(
+  //           onPressed: () => Navigator.pop(context),
+  //           child: const Text("Cancel"),
+  //         ),
+  //       ),
+  //       const SizedBox(width: 12),
+  //       Expanded(
+  //         child: ElevatedButton(
+  //           onPressed: () {
+  //             Navigator.pop(
+  //               context,
+  //               TransactionFilterResult(
+  //                 salespersonName: _selectedSalesperson,
+  //                 fromDate: _fromDate,
+  //                 toDate: _toDate,
+  //                 status: _status,
+  //               ),
+  //             );
+  //           },
+  //           child: const Text("Apply Filter"),
+  //         ),
+  //       ),
+  //     ],
+  //   );
+  // }
+
+   Widget _actions(BuildContext context) {
+  return Column(
+    children: [
+
+      // 🔹 Clear Filter Button
+      SizedBox(
+        width: double.infinity,
+        child: TextButton(
+          onPressed: () {
+            Navigator.pop(context, null); // return null explicitly
+          },
+          child: const Text(
+            "Clear Filter",
+            style: TextStyle(color: Colors.red),
           ),
         ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: ElevatedButton(
-            onPressed: () {
-              Navigator.pop(
-                context,
-                TransactionFilterResult(
-                  salespersonName: _selectedSalesperson,
-                  fromDate: _fromDate,
-                  toDate: _toDate,
-                  status: _status,
-                ),
-              );
-            },
-            child: const Text("Apply Filter"),
+      ),
+
+      const SizedBox(height: 12),
+
+      Row(
+        children: [
+          Expanded(
+            child: OutlinedButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("Cancel"),
+            ),
           ),
-        ),
-      ],
-    );
-  }
+          const SizedBox(width: 12),
+          Expanded(
+            child: ElevatedButton(
+              onPressed: () {
+                Navigator.pop(
+                  context,
+                  TransactionFilterResult(
+                    salespersonName: _selectedSalesperson,
+                    fromDate: _fromDate,
+                    toDate: _toDate,
+                    status: _status,
+                  ),
+                );
+              },
+              child: const Text("Apply Filter"),
+            ),
+          ),
+        ],
+      ),
+    ],
+  );
+}
+
+
 }
