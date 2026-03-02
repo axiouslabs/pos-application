@@ -42,12 +42,21 @@ exports.getAllSales = asyncHandler(async (req, res) => {
 });
 
 
+// exports.getMySales = asyncHandler(async (req, res) => {
+//   const sales = await service.getSalesBySalesperson(req.user.id);
+//   res.json(sales);
+// });
+
 exports.getMySales = asyncHandler(async (req, res) => {
-  const sales = await service.getSalesBySalesperson(req.user.id);
+  const { from, to } = req.query;
+
+  const sales = await service.getSalesBySalesperson(req.user.id, {
+    from,
+    to,
+  });
+
   res.json(sales);
 });
-
-
 
 exports.voidSale = asyncHandler(async (req, res) => {
   const saleId = req.params.id;

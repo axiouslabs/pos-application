@@ -8,9 +8,16 @@ class Sale {
   final int id;
   final int customerId;
   final String salespersonName;
+  
   final String customerName;
-  final String customerPhone;
-  final String? customerTin;  // ✅ ADD
+
+
+  // final String customerPhone;
+  // final String? customerTin;  // ✅ ADD
+   
+   final String? customerPhone;
+final String? customerTin;
+  
 
   final List<SaleItem> items;
   final List<Payment> payments;
@@ -34,8 +41,11 @@ class Sale {
     required this.customerId,
     required this.salespersonName,
     required this.customerName,
-    required this.customerPhone,
-    this.customerTin,
+    // required this.customerPhone,
+    // this.customerTin,
+
+    this.customerPhone,
+this.customerTin,
     required this.items,
     required this.payments,
     required this.subtotalAmount,
@@ -50,31 +60,6 @@ class Sale {
      required this.saleStatus, // <-- ADD
   });
 
-  // factory Sale.fromJson(Map<String, dynamic> json) {
-  //   print("🔥 PARSING Sale.fromJson...");
-
-  //   final saleData = json["sale"];
-
-  //   return Sale(
-  //     id: saleData["id"],
-  //     customerId: saleData["customer_id"],
-  //     salespersonName: saleData["salesperson_name"] ?? "",
-  //     customerName: saleData["customer_name"] ?? "",
-  //     customerPhone: saleData["customer_phone"] ?? "",
-
-  //     items: (json["items"] as List)
-  //         .map((i) => SaleItem.fromJson(i))
-  //         .toList(),
-
-  //     payments: (json["payments"] as List)
-  //         .map((p) => Payment.fromJson(p))
-  //         .toList(),
-
-  //     totalAmount: double.parse(saleData["total_amount"].toString()),
-  //     paymentStatus: saleData["payment_status"],
-  //     saleDate: DateTime.parse(saleData["sale_date"]),
-  //   );
-  // }
 
   factory Sale.fromJson(Map<String, dynamic> json) {
   final saleData = json["sale"] ?? json;
@@ -85,8 +70,11 @@ class Sale {
 
     salespersonName: saleData["salesperson_name"] ?? "",
     customerName: saleData["customer_name"] ?? "",
-    customerPhone: saleData["customer_phone"] ?? "",
-    customerTin: saleData["customer_tin"],  // ✅ ADD
+    // customerPhone: saleData["customer_phone"] ?? "",
+    // customerTin: saleData["customer_tin"],  // ✅ ADD
+
+    customerPhone: saleData["customer_phone"],
+customerTin: saleData["customer_tin"],
 
     items: (json["items"] as List?)?.map((i) => SaleItem.fromJson(i)).toList() ?? [],
     payments: (json["payments"] as List?)?.map((p) => Payment.fromJson(p)).toList() ?? [],

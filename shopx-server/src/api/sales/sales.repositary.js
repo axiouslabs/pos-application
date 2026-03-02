@@ -224,9 +224,37 @@ exports.getAllSales = async ({ from, to, salesperson, status }) => {
   return r.rows;
 };
 
-exports.getSalesBySalesperson = async (salespersonId) => {
-  const r = await db.query(
-    `
+// exports.getSalesBySalesperson = async (salespersonId) => {
+//   const r = await db.query(
+//     `
+//     SELECT
+//       s.id,
+//       s.customer_id,
+//       s.subtotal_amount,
+//       s.discount_amount,
+//       s.vat_amount,
+//       s.vat_percentage,
+//       s.total_amount,
+//       s.payment_status,
+//       s.sale_status,          -- ✅ CRITICAL: tells frontend if cancelled
+//       s.sale_date,
+//       u.username AS salesperson_name,
+//       c.name AS customer_name,
+//       c.phone AS customer_phone
+//     FROM sales s
+//     LEFT JOIN users u ON u.id = s.salesperson_id
+//     LEFT JOIN customers c ON c.id = s.customer_id
+//     WHERE s.salesperson_id = $1
+//     ORDER BY s.sale_date DESC
+//     `,
+//     [salespersonId]
+//   );
+  
+//   return r.rows;
+// };
+
+exports.getSalesBySalesperson = async (salespersonId, { from, to }) => {
+  let query = `
     SELECT
       s.id,
       s.customer_id,
@@ -236,7 +264,7 @@ exports.getSalesBySalesperson = async (salespersonId) => {
       s.vat_percentage,
       s.total_amount,
       s.payment_status,
-      s.sale_status,          -- ✅ CRITICAL: tells frontend if cancelled
+      s.sale_status,
       s.sale_date,
       u.username AS salesperson_name,
       c.name AS customer_name,
@@ -245,11 +273,25 @@ exports.getSalesBySalesperson = async (salespersonId) => {
     LEFT JOIN users u ON u.id = s.salesperson_id
     LEFT JOIN customers c ON c.id = s.customer_id
     WHERE s.salesperson_id = $1
-    ORDER BY s.sale_date DESC
-    `,
-    [salespersonId]
-  );
-  
+  `;
+
+  const values = [salespersonId];
+  let index = 2;
+
+  // ✅ DEFAULT: TODAY ONLY if no filter
+  if (!from && !to) {
+    query += ` AND s.sale_date >= CURRENT_DATE 
+               AND s.sale_date < CURRENT_DATE + INTERVAL '1 day'`;
+  }
+
+  if (from && to) {
+    query += ` AND s.sale_date >= $${index} 
+               AND s.sale_date < $${index + 1}::date + INTERVAL '1 day'`;
+    values.push(from, to);
+  }
+
+  query += ` ORDER BY s.sale_date DESC`;
+
+  const r = await db.query(query, values);
   return r.rows;
 };
-

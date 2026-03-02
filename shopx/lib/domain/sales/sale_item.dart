@@ -55,7 +55,8 @@ class SaleItem {
       unitPrice: double.parse(json["unit_price"].toString()),
       totalPrice: double.parse(json["total_price"].toString()),
       productName: json["product_name"] ?? "",
-       productNameAr: json["product_name_ar"], // ✅ THIS WAS MISSING
+      //  productNameAr: json["product_name_ar"], // ✅ THIS WAS MISSING
+      productNameAr: json["product_name_ar"] ?? "",
     );
   }
 }

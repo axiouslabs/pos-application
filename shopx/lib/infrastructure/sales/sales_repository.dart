@@ -100,10 +100,21 @@ class SalesRepository {
 
 
   // USER
-  Future<List<Sale>> getMySales() async {
-    final list = await api.getMySales();
-    return list.map((e) => Sale.fromJson(e)).toList();
-  }
+  Future<List<Sale>> getMySales({
+  String? from,
+  String? to,
+}) async {
+  final list = await api.getMySales(
+    from: from,
+    to: to,
+  );
+
+  return list.map((e) => Sale.fromJson(e)).toList();
+}
+  // Future<List<Sale>> getMySales() async {
+  //   final list = await api.getMySales();
+  //   return list.map((e) => Sale.fromJson(e)).toList();
+  // }
 
   Future<void> voidSale(int saleId) async {
     await api.voidSale(saleId);

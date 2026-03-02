@@ -3,6 +3,7 @@ import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:shopx/application/sales/sales_notifier.dart';
 import 'package:shopx/application/settings/settings_notifier.dart';
 import 'package:shopx/core/constants.dart';
 import 'package:shopx/domain/reciept/reciept_from_sale.dart';
@@ -34,31 +35,29 @@ class TransactionDetailsDialog extends HookConsumerWidget {
   bool get _isVoided => sale.saleStatus == 'voided';
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-//     final settingsState = ref.watch(settingsNotifierProvider);
-// final companySettings = settingsState.settings!;
+    //     final settingsState = ref.watch(settingsNotifierProvider);
+    // final companySettings = settingsState.settings!;
 
+    // 🔒 DEFENSIVE LOAD: ensure settings exist when dialog opens
+    useEffect(() {
+      Future.microtask(() {
+        ref.read(settingsNotifierProvider.notifier).loadOnce();
+      });
+      return null;
+    }, []);
 
-  // 🔒 DEFENSIVE LOAD: ensure settings exist when dialog opens
-  useEffect(() {
-    Future.microtask(() {
-      ref.read(settingsNotifierProvider.notifier).loadOnce();
-    });
-    return null;
-  }, []);
+    final settingsState = ref.watch(settingsNotifierProvider);
 
-final settingsState = ref.watch(settingsNotifierProvider);
+    if (settingsState.isLoading || settingsState.settings == null) {
+      return const Dialog(
+        child: Padding(
+          padding: EdgeInsets.all(24),
+          child: Center(child: CircularProgressIndicator()),
+        ),
+      );
+    }
 
-if (settingsState.isLoading || settingsState.settings == null) {
-  return const Dialog(
-    child: Padding(
-      padding: EdgeInsets.all(24),
-      child: Center(child: CircularProgressIndicator()),
-    ),
-  );
-}
-
-final companySettings = settingsState.settings!;
-
+    final companySettings = settingsState.settings!;
 
     final isSubmitting = useState(false);
 
@@ -76,7 +75,8 @@ final companySettings = settingsState.settings!;
                 const SizedBox(height: 20),
 
                 _infoRow("Customer", sale.customerName),
-                _infoRow("Phone", sale.customerPhone),
+                // _infoRow("Phone", sale.customerPhone),
+                _infoRow("Phone", sale.customerPhone ?? ""),
                 _infoRow("Salesperson", sale.salespersonName),
                 _infoRow(
                   "Date",
@@ -165,7 +165,7 @@ final companySettings = settingsState.settings!;
                     icon: const Icon(Icons.receipt_long),
                     label: const Text("Preview Receipt"),
                     onPressed: () {
-                      final receipt = receiptFromSale(sale,companySettings);
+                      final receipt = receiptFromSale(sale, companySettings);
 
                       Navigator.push(
                         context,
@@ -178,115 +178,120 @@ final companySettings = settingsState.settings!;
                   ),
                 ),
 
-
-
-
-
-
-                //new code 
-
+                //new code
                 kHeight12,
 
-// ================= SEND RECEIPT =================
-SizedBox(
-  width: double.infinity,
-  child: ElevatedButton.icon(
-    icon: const Icon(Icons.send),
-    label: const Text("Send Receipt"),
-    style: ElevatedButton.styleFrom(
-      padding: const EdgeInsets.symmetric(vertical: 14),
-      backgroundColor: const Color(0xFFE3F2FD),
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
+                // ================= SEND RECEIPT =================
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    icon: const Icon(Icons.send),
+                    label: const Text("Send Receipt"),
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      backgroundColor: const Color(0xFFE3F2FD),
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    onPressed: () async {
+                      // 🔒 SAFETY: don’t allow for voided sales
+                      if (_isVoided) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              "Cannot send receipt for cancelled sale.",
+                            ),
+                          ),
+                        );
+                        return;
+                      }
+
+                      // ✅ Build receipt from THIS sale
+                      final receipt = receiptFromSale(sale, companySettings);
+
+                      // ✅ Generate PDF
+                      final file = await PdfReceiptService.generateReceiptPdf(
+                        receipt: receipt,
+                        settings: companySettings,
+                      );
+
+                      // ✅ Share (WhatsApp / Gmail / etc.)
+                      await Share.shareXFiles([
+                        XFile(file.path),
+                      ], text: 'Invoice ${sale.id}');
+                    },
+                  ),
+                ),
+
+                kHeight16,
+
+                // ================= EDIT SALE =================
+                if (!_isVoided)
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blueGrey,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Text(
+                        "Edit Sale",
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+
+                      // onPressed: () {
+                      //   Navigator.of(context).pop(); // close dialog
+
+                      //   Navigator.push(
+                      //     context,
+                      //     MaterialPageRoute(
+                      //       builder: (_) => CartScreen(saleToEdit: sale),
+                      //     ),
+                      //   );
+                      // },
+onPressed: () async {
+  final notifier = ref.read(salesNotifierProvider.notifier);
+  final fullSale = await notifier.getSale(sale.id);
+
+  Navigator.of(context).pop(); // close dialog FIRST
+
+  Navigator.of(context, rootNavigator: true).push(
+    MaterialPageRoute(
+      builder: (_) => CartScreen(saleToEdit: fullSale),
     ),
-    onPressed: () async {
-      // 🔒 SAFETY: don’t allow for voided sales
-      if (_isVoided) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Cannot send receipt for cancelled sale."),
-          ),
-        );
-        return;
-      }
+  );
+}
+                    ),
+                  ),
 
-      // ✅ Build receipt from THIS sale
-      final receipt = receiptFromSale(sale, companySettings);
+                kHeight16,
 
-      // ✅ Generate PDF
-      final file = await PdfReceiptService.generateReceiptPdf(
-        receipt: receipt,
-        settings: companySettings,
-      );
+                if (!_isVoided && _isPending)
+                  _markAsPaidButton(context, isSubmitting),
 
-      // ✅ Share (WhatsApp / Gmail / etc.)
-      await Share.shareXFiles(
-        [XFile(file.path)],
-        text: 'Invoice ${sale.id}',
-      );
-    },
-  ),
-),
+                kHeight20,
 
-
-kHeight16,
-
-// ================= EDIT SALE =================
-if (!_isVoided)
-  SizedBox(
-    width: double.infinity,
-    child: ElevatedButton(
-      style: ElevatedButton.styleFrom(
-        backgroundColor: Colors.blueGrey,
-        padding: const EdgeInsets.symmetric(vertical: 14),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-      ),
-      child: const Text(
-        "Edit Sale",
-        style: TextStyle(
-          fontWeight: FontWeight.bold,
-          color: Colors.white,
-        ),
-      ),
-      onPressed: () {
-        Navigator.of(context).pop(); // close dialog
-
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => CartScreen(saleToEdit: sale),
-          ),
-        );
-      },
-    ),
-  ),
-
-kHeight16,
-
-if (!_isVoided && _isPending)
-  _markAsPaidButton(context, isSubmitting),
-
-kHeight20,
-
-if (!_isVoided && onCancelSale != null)
-  _cancelSaleButton(context, isSubmitting),
+                if (!_isVoided && onCancelSale != null)
+                  _cancelSaleButton(context, isSubmitting),
 
                 // kHeight16,
 
                 // // if (_isPending) _markAsPaidButton(context),
                 // if (!_isVoided && _isPending)
                 //   _markAsPaidButton(context, isSubmitting),
-                  
 
                 // kHeight20,
 
                 // if (!_isVoided && onCancelSale != null)
                 //   _cancelSaleButton(context, isSubmitting),
-
                 if (_isVoided)
                   const Text(
                     "This sale has been cancelled.",

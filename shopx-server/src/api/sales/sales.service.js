@@ -243,8 +243,12 @@ exports.getAllSales = async (filters) => {
   return await repo.getAllSales(filters);
 };
 
-exports.getSalesBySalesperson = async (salespersonId) => {
-  return await repo.getSalesBySalesperson(salespersonId);
+// exports.getSalesBySalesperson = async (salespersonId) => {
+//   return await repo.getSalesBySalesperson(salespersonId);
+// };
+
+exports.getSalesBySalesperson = async (salespersonId, filters = {}) => {
+  return await repo.getSalesBySalesperson(salespersonId, filters);
 };
 
 exports.reviseSale = async (saleId, updatedData, user) => {

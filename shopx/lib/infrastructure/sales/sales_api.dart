@@ -44,10 +44,24 @@ class SalesApi {
 
 
   // USER ONLY
-  Future<List<dynamic>> getMySales() async {
-    final res = await _dio.get("/sales/my");
-    return res.data;
-  }
+  Future<List<dynamic>> getMySales({
+  String? from,
+  String? to,
+}) async {
+  final res = await _dio.get(
+    "/sales/my",
+    queryParameters: {
+      if (from != null) "from": from,
+      if (to != null) "to": to,
+    },
+  );
+
+  return res.data;
+}
+  // Future<List<dynamic>> getMySales() async {
+  //   final res = await _dio.get("/sales/my");
+  //   return res.data;
+  // }
 
   Future<void> voidSale(int saleId) async {
     await _dio.post("/sales/$saleId/void");

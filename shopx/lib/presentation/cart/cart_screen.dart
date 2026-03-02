@@ -141,7 +141,7 @@ paymentStatus.value = saleToEdit!.paymentStatus;
   }
 
   return null;
-}, []);
+}, [saleToEdit]);
 
 
 
@@ -504,13 +504,23 @@ if (saleToEdit == null) {
                               );
                             },
 
-                            fieldViewBuilder:
-                                (context, controller, focusNode, onSubmit) {
-                                  // Sync autocomplete value → nameCtrl
-                                  controller.addListener(() {
-                                    nameCtrl.text = controller.text;
-                                  });
+                            // fieldViewBuilder:
+                            //     (context, controller, focusNode, onSubmit) {
+                            //       // Sync autocomplete value → nameCtrl
+                            //       controller.addListener(() {
+                            //         nameCtrl.text = controller.text;
+                            //       });
 
+fieldViewBuilder: (context, controller, focusNode, onSubmit) {
+
+  // 👇 IMPORTANT: sync nameCtrl into Autocomplete controller
+  if (controller.text.isEmpty && nameCtrl.text.isNotEmpty) {
+    controller.text = nameCtrl.text;
+  }
+
+  controller.addListener(() {
+    nameCtrl.text = controller.text;
+  });
                                   return Container(
                                     decoration: BoxDecoration(
                                       color: const Color(0xFFF3F4F6),

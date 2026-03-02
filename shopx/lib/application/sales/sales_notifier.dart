@@ -92,25 +92,34 @@ class SalesNotifier extends Notifier<SalesState> {
 }
 
   // USER (already correct)
-  Future<void> fetchMySales() async {
-    state = state.copyWith(isLoading: true);
-    try {
-      final list = await ref.read(salesRepositoryProvider).getMySales();
-      state = state.copyWith(isLoading: false, sales: list);
-    } catch (e) {
-      state = state.copyWith(isLoading: false, error: e.toString());
-    }
-  }
+  Future<void> fetchMySales({
+  String? from,
+  String? to,
+}) async {
+  state = state.copyWith(isLoading: true);
 
-  //   Future<void> voidSale(int saleId) async {
+  try {
+    final list = await ref.read(salesRepositoryProvider).getMySales(
+      from: from,
+      to: to,
+    );
+
+    state = state.copyWith(isLoading: false, sales: list);
+  } catch (e) {
+    state = state.copyWith(isLoading: false, error: e.toString());
+  }
+}
+  // Future<void> fetchMySales() async {
+  //   state = state.copyWith(isLoading: true);
   //   try {
-  //     await ref.read(salesRepositoryProvider).voidSale(saleId);
-  //     await fetchAdminSales(); // refresh list after cancel
+  //     final list = await ref.read(salesRepositoryProvider).getMySales();
+  //     state = state.copyWith(isLoading: false, sales: list);
   //   } catch (e) {
-  //     state = state.copyWith(error: e.toString());
-  //     rethrow;
+  //     state = state.copyWith(isLoading: false, error: e.toString());
   //   }
   // }
+
+  
 
   Future<void> voidSale(int saleId) async {
     try {
