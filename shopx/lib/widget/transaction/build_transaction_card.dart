@@ -7,9 +7,14 @@ Widget buildTransactionCard(Sale sale, Color primaryBlue) {
   final trxId = "#TRX${sale.id.toString().padLeft(10, '0')}";
 
   // ✅ MOVE LOGIC OUTSIDE WIDGET TREE
-  late Color statusColor;
-  late String statusText;
+ late Color statusColor;
+late String statusText;
 
+// 🔴 PRIORITY CHECK — CANCELLED FIRST
+if (sale.saleStatus.toLowerCase() == 'voided') {
+  statusColor = Colors.red;
+  statusText = "CANCELLED";
+} else {
   switch (sale.paymentStatus.toLowerCase()) {
     case "pending":
       statusColor = Colors.orange;
@@ -23,6 +28,7 @@ Widget buildTransactionCard(Sale sale, Color primaryBlue) {
       statusColor = Colors.grey;
       statusText = sale.paymentStatus.toUpperCase();
   }
+}
 
   return Container(
     margin: const EdgeInsets.only(bottom: 16),

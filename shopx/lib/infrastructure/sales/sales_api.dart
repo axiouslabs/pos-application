@@ -47,12 +47,14 @@ class SalesApi {
   Future<List<dynamic>> getMySales({
   String? from,
   String? to,
+  String? status,
 }) async {
   final res = await _dio.get(
     "/sales/my",
     queryParameters: {
       if (from != null) "from": from,
       if (to != null) "to": to,
+      if (status != null) "status": status,
     },
   );
 

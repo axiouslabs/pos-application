@@ -17,10 +17,12 @@ class TransactionFilterResult {
 
 class TransactionFilterDialog extends StatefulWidget {
   final List<String> salespersons;
+  final bool isAdmin;
 
   const TransactionFilterDialog({
     super.key,
-    required this.salespersons,
+    this.salespersons = const [],
+    this.isAdmin = false,
   });
 
   @override
@@ -34,7 +36,7 @@ class _TransactionFilterDialogState extends State<TransactionFilterDialog> {
   DateTime? _toDate;
   String _status = 'ALL';
 
-  final List<String> _statusOptions = ['ALL', 'PAID', 'PENDING', 'VOID'];
+  final List<String> _statusOptions = ['ALL', 'PAID', 'PENDING', 'CANCELLED'];
 
   @override
   Widget build(BuildContext context) {
@@ -50,8 +52,10 @@ class _TransactionFilterDialogState extends State<TransactionFilterDialog> {
             _header(context),
             const SizedBox(height: 20),
 
-            _salespersonAutocomplete(),
-            const SizedBox(height: 16),
+           if (widget.isAdmin) ...[
+  _salespersonAutocomplete(),
+  const SizedBox(height: 16),
+],
 
             _datePicker(
               label: "From Date",

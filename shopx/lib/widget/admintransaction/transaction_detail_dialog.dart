@@ -164,8 +164,28 @@ class TransactionDetailsDialog extends HookConsumerWidget {
                   child: OutlinedButton.icon(
                     icon: const Icon(Icons.receipt_long),
                     label: const Text("Preview Receipt"),
-                    onPressed: () {
-                      final receipt = receiptFromSale(sale, companySettings);
+
+                    // onPressed: () {
+                    //   final receipt = receiptFromSale(sale, companySettings);
+
+                    //   Navigator.push(
+                    //     context,
+                    //     MaterialPageRoute(
+                    //       builder: (_) =>
+                    //           RecieptPreviewScreen(receipt: receipt),
+                    //     ),
+                    //   );
+                    // },
+                    onPressed: () async {
+                      final notifier = ref.read(salesNotifierProvider.notifier);
+
+                      // 🔥 Fetch full sale with customer_tin
+                      final fullSale = await notifier.getSale(sale.id);
+
+                      final receipt = receiptFromSale(
+                        fullSale,
+                        companySettings,
+                      );
 
                       Navigator.push(
                         context,
@@ -195,33 +215,66 @@ class TransactionDetailsDialog extends HookConsumerWidget {
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
+
+                    // onPressed: () async {
+                    //   // 🔒 SAFETY: don’t allow for voided sales
+                    //   if (_isVoided) {
+                    //     ScaffoldMessenger.of(context).showSnackBar(
+                    //       const SnackBar(
+                    //         content: Text(
+                    //           "Cannot send receipt for cancelled sale.",
+                    //         ),
+                    //       ),
+                    //     );
+                    //     return;
+                    //   }
+
+                    //   // ✅ Build receipt from THIS sale
+                    //   final receipt = receiptFromSale(sale, companySettings);
+
+                    //   print("🔥 PDF CUSTOMER VAT = ${receipt.customerVat}");
+
+                    //   // ✅ Generate PDF
+                    //   final file = await PdfReceiptService.generateReceiptPdf(
+                    //     receipt: receipt,
+                    //     settings: companySettings,
+                    //   );
+
+                    //   // ✅ Share (WhatsApp / Gmail / etc.)
+                    //   await Share.shareXFiles([
+                    //     XFile(file.path),
+                    //   ], text: 'Invoice ${sale.id}');
+                    // },
+
                     onPressed: () async {
-                      // 🔒 SAFETY: don’t allow for voided sales
-                      if (_isVoided) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text(
-                              "Cannot send receipt for cancelled sale.",
-                            ),
-                          ),
-                        );
-                        return;
-                      }
+  if (_isVoided) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text("Cannot send receipt for cancelled sale."),
+      ),
+    );
+    return;
+  }
 
-                      // ✅ Build receipt from THIS sale
-                      final receipt = receiptFromSale(sale, companySettings);
+  final notifier = ref.read(salesNotifierProvider.notifier);
 
-                      // ✅ Generate PDF
-                      final file = await PdfReceiptService.generateReceiptPdf(
-                        receipt: receipt,
-                        settings: companySettings,
-                      );
+  // 🔥 Fetch FULL sale (includes customer_tin)
+  final fullSale = await notifier.getSale(sale.id);
 
-                      // ✅ Share (WhatsApp / Gmail / etc.)
-                      await Share.shareXFiles([
-                        XFile(file.path),
-                      ], text: 'Invoice ${sale.id}');
-                    },
+  final receipt = receiptFromSale(fullSale, companySettings);
+
+  print("🔥 PDF CUSTOMER VAT = ${receipt.customerVat}");
+
+  final file = await PdfReceiptService.generateReceiptPdf(
+    receipt: receipt,
+    settings: companySettings,
+  );
+
+  await Share.shareXFiles(
+    [XFile(file.path)],
+    text: 'Invoice ${fullSale.id}',
+  );
+},
                   ),
                 ),
 
@@ -257,18 +310,20 @@ class TransactionDetailsDialog extends HookConsumerWidget {
                       //     ),
                       //   );
                       // },
-onPressed: () async {
-  final notifier = ref.read(salesNotifierProvider.notifier);
-  final fullSale = await notifier.getSale(sale.id);
+                      onPressed: () async {
+                        final notifier = ref.read(
+                          salesNotifierProvider.notifier,
+                        );
+                        final fullSale = await notifier.getSale(sale.id);
 
-  Navigator.of(context).pop(); // close dialog FIRST
+                        Navigator.of(context).pop(); // close dialog FIRST
 
-  Navigator.of(context, rootNavigator: true).push(
-    MaterialPageRoute(
-      builder: (_) => CartScreen(saleToEdit: fullSale),
-    ),
-  );
-}
+                        Navigator.of(context, rootNavigator: true).push(
+                          MaterialPageRoute(
+                            builder: (_) => CartScreen(saleToEdit: fullSale),
+                          ),
+                        );
+                      },
                     ),
                   ),
 

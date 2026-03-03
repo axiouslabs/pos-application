@@ -95,14 +95,16 @@ class SalesNotifier extends Notifier<SalesState> {
   Future<void> fetchMySales({
   String? from,
   String? to,
+  String? status,
 }) async {
   state = state.copyWith(isLoading: true);
 
   try {
     final list = await ref.read(salesRepositoryProvider).getMySales(
-      from: from,
-      to: to,
-    );
+  from: from,
+  to: to,
+  status: status,
+);
 
     state = state.copyWith(isLoading: false, sales: list);
   } catch (e) {

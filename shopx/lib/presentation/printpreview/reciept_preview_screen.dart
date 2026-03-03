@@ -28,33 +28,36 @@ class RecieptPreviewScreen extends HookConsumerWidget {
   //   return DateFormat('yyyy-MM-dd hh:mm a').format(date);
   // }
 
-  String formatInvoiceDate(DateTime date) {
-  // Ensure UTC first
-  final utcDate = date.toUtc();
+  //   String formatInvoiceDate(DateTime date) {
+  //   // Ensure UTC first
+  //   final utcDate = date.toUtc();
 
-  // Dubai is UTC +4
-  final dubaiTime = utcDate.add(const Duration(hours: 4));
+  //   // Dubai is UTC +4
+  //   final dubaiTime = utcDate.add(const Duration(hours: 4));
 
-  return DateFormat('yyyy-MM-dd hh:mm a').format(dubaiTime);
+  //   return DateFormat('yyyy-MM-dd hh:mm a').format(dubaiTime);
+  // }
+
+   String formatInvoiceDate(DateTime date) {
+  return DateFormat('yyyy-MM-dd hh:mm a').format(date);
 }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-   final settingsState = ref.watch(settingsNotifierProvider);
+    final settingsState = ref.watch(settingsNotifierProvider);
 
-if (settingsState.settings == null) {
-  return const Scaffold(
-    body: Center(
-      child: Text(
-        "Company settings not configured.\nPlease contact admin.",
-        textAlign: TextAlign.center,
-      ),
-    ),
-  );
-}
+    if (settingsState.settings == null) {
+      return const Scaffold(
+        body: Center(
+          child: Text(
+            "Company settings not configured.\nPlease contact admin.",
+            textAlign: TextAlign.center,
+          ),
+        ),
+      );
+    }
 
-final settings = settingsState.settings!;
-
+    final settings = settingsState.settings!;
 
     final qrData = ZatcaQr.generate(
       sellerName: settings.companyNameEn,

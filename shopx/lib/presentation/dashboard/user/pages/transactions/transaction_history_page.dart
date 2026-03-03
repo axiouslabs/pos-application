@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:shopx/application/sales/sales_notifier.dart';
 import 'package:shopx/domain/sales/sale.dart';
 import 'package:shopx/presentation/dashboard/user/pages/transactions/transaction_detail_sheet.dart';
+import 'package:shopx/widget/admintransaction/transaction_filter_dialog.dart';
 import 'package:shopx/widget/transaction/build_transaction_card.dart';
 
 class TransactionHistoryPage extends HookConsumerWidget {
@@ -24,49 +25,45 @@ class TransactionHistoryPage extends HookConsumerWidget {
     final salesState = ref.watch(salesNotifierProvider);
     final sales = salesState.sales;
 
-    // // 3. Data Processing: Group by Date & Calculate Daily Totals
-    // // We use useMemoized to avoid recalculating on every rebuild unless sales change
-    // final groupedSales = useMemoized(() {
-    //   final Map<String, List<Sale>> map = {};
+    // ✅ 3️⃣ DECLARE selectedStatus HERE (THIS WAS MISSING)
+    // final selectedStatus = useState<String>('ALL');
 
-    //   // Sort desc (newest first)
-    //   final sortedSales = [...sales]
-    //     ..sort((a, b) => b.saleDate.compareTo(a.saleDate));
+    //   final groupedSales = useMemoized(() {
+    //     final Map<String, List<Sale>> map = {};
 
-    //   for (var sale in sortedSales) {
-    //     final dateKey = DateFormat('EEEE, MMMM d, yyyy').format(sale.saleDate);
-    //     if (!map.containsKey(dateKey)) {
-    //       map[dateKey] = [];
+    //     // 1️⃣ FILTER BY STATUS
+    //     final filteredSales = sales.where((sale) {
+    //       if (selectedStatus.value == 'ALL') return true;
+    //       return sale.paymentStatus.toUpperCase() == selectedStatus.value;
+    //     }).toList();
+
+    //     // 2️⃣ SORT DESC
+    //     filteredSales.sort((a, b) => b.saleDate.compareTo(a.saleDate));
+
+    //     // 3️⃣ GROUP BY DATE
+    //     for (var sale in filteredSales) {
+    //       final dateKey = DateFormat('EEEE, MMMM d, yyyy').format(sale.saleDate);
+    //       map.putIfAbsent(dateKey, () => []);
+    //       map[dateKey]!.add(sale);
     //     }
-    //     map[dateKey]!.add(sale);
-    //   }
-    //   return map;
-    // }, [sales]);
 
-     // ✅ 3️⃣ DECLARE selectedStatus HERE (THIS WAS MISSING)
-  final selectedStatus = useState<String>('ALL');
+    //     return map;
+    //   }, [sales, selectedStatus.value]);
 
     final groupedSales = useMemoized(() {
       final Map<String, List<Sale>> map = {};
 
-      // 1️⃣ FILTER BY STATUS
-      final filteredSales = sales.where((sale) {
-        if (selectedStatus.value == 'ALL') return true;
-        return sale.paymentStatus.toUpperCase() == selectedStatus.value;
-      }).toList();
+      final sortedSales = [...sales]
+        ..sort((a, b) => b.saleDate.compareTo(a.saleDate));
 
-      // 2️⃣ SORT DESC
-      filteredSales.sort((a, b) => b.saleDate.compareTo(a.saleDate));
-
-      // 3️⃣ GROUP BY DATE
-      for (var sale in filteredSales) {
+      for (var sale in sortedSales) {
         final dateKey = DateFormat('EEEE, MMMM d, yyyy').format(sale.saleDate);
         map.putIfAbsent(dateKey, () => []);
         map[dateKey]!.add(sale);
       }
 
       return map;
-    }, [sales, selectedStatus.value]);
+    }, [sales]);
 
     // Constants
     const primaryBlue = Color(0xFF1976D2);
@@ -107,9 +104,10 @@ class TransactionHistoryPage extends HookConsumerWidget {
             ),
 
             // ================= FILTER BAR (UI ONLY) =================
+
             // Container(
             //   margin: const EdgeInsets.only(bottom: 8),
-            //   padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+            //   padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
             //   decoration: const BoxDecoration(
             //     color: Colors.white,
             //     boxShadow: [
@@ -120,72 +118,74 @@ class TransactionHistoryPage extends HookConsumerWidget {
             //       ),
             //     ],
             //   ),
-            //   child: const Row(
+            //   child: Row(
             //     children: [
-            //       Icon(Icons.tune, color: Color(0xFF2C3E50), size: 20),
-            //       SizedBox(width: 12),
+            //       const Icon(
+            //         Icons.filter_list,
+            //         color: Color(0xFF2C3E50),
+            //         size: 20,
+            //       ),
+            //       const SizedBox(width: 12),
+
+            //       // STATUS DROPDOWN
             //       Expanded(
-            //         child: Text(
-            //           "Date and time of the filter",
-            //           style: TextStyle(
-            //             color: Color(0xFF2C3E50),
-            //             fontSize: 14,
-            //             fontWeight: FontWeight.w500,
+            //         child: DropdownButtonHideUnderline(
+            //           child: DropdownButton<String>(
+            //             value: selectedStatus.value,
+            //             isExpanded: true,
+            //             icon: const Icon(Icons.keyboard_arrow_down),
+            //             items: const [
+            //               DropdownMenuItem(value: 'ALL', child: Text('All')),
+            //               DropdownMenuItem(value: 'PAID', child: Text('Paid')),
+            //               DropdownMenuItem(
+            //                 value: 'PENDING',
+            //                 child: Text('Pending'),
+            //               ),
+            //             ],
+            //             onChanged: (value) {
+            //               if (value != null) {
+            //                 selectedStatus.value = value;
+            //               }
+            //             },
             //           ),
             //         ),
             //       ),
-            //       Icon(Icons.keyboard_arrow_right, color: Color(0xFF2C3E50)),
             //     ],
             //   ),
             // ),
-            Container(
-              margin: const EdgeInsets.only(bottom: 8),
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black12,
-                    blurRadius: 4,
-                    offset: Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  const Icon(
-                    Icons.filter_list,
-                    color: Color(0xFF2C3E50),
-                    size: 20,
-                  ),
-                  const SizedBox(width: 12),
 
-                  // STATUS DROPDOWN
-                  Expanded(
-                    child: DropdownButtonHideUnderline(
-                      child: DropdownButton<String>(
-                        value: selectedStatus.value,
-                        isExpanded: true,
-                        icon: const Icon(Icons.keyboard_arrow_down),
-                        items: const [
-                          DropdownMenuItem(value: 'ALL', child: Text('All')),
-                          DropdownMenuItem(value: 'PAID', child: Text('Paid')),
-                          DropdownMenuItem(
-                            value: 'PENDING',
-                            child: Text('Pending'),
-                          ),
-                        ],
-                        onChanged: (value) {
-                          if (value != null) {
-                            selectedStatus.value = value;
-                          }
-                        },
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            Padding(
+  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+  child: Align(
+    alignment: Alignment.centerRight,
+    child: TextButton.icon(
+      icon: const Icon(Icons.tune),
+      label: const Text("Filter"),
+      onPressed: () async {
+        final result = await showDialog<TransactionFilterResult>(
+          context: context,
+          builder: (_) => const TransactionFilterDialog(),
+        );
+
+        if (result == null) {
+          // Reset → Today only
+          await ref
+              .read(salesNotifierProvider.notifier)
+              .fetchMySales();
+        } else {
+          await ref
+              .read(salesNotifierProvider.notifier)
+              .fetchMySales(
+                from: result.fromDate?.toIso8601String(),
+                to: result.toDate?.toIso8601String(),
+                status:
+                    result.status == 'ALL' ? null : result.status,
+              );
+        }
+      },
+    ),
+  ),
+),
 
             // ================= CONTENT =================
             Expanded(
@@ -230,10 +230,14 @@ class TransactionHistoryPage extends HookConsumerWidget {
                       final daySales = groupedSales[dateKey]!;
 
                       // Calculate Total for this day
-                      final double dayTotal = daySales.fold(
-                        0,
-                        (sum, item) => sum + item.totalAmount,
-                      );
+                      // final double dayTotal = daySales.fold(
+                      //   0,
+                      //   (sum, item) => sum + item.totalAmount,
+                      // );
+
+                      final double dayTotal = daySales
+    .where((s) => s.saleStatus != 'voided')
+    .fold(0, (sum, item) => sum + item.totalAmount);
 
                       return Column(
                         crossAxisAlignment: CrossAxisAlignment.start,

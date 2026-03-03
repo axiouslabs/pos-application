@@ -100,13 +100,15 @@ class SalesRepository {
 
 
   // USER
-  Future<List<Sale>> getMySales({
+ Future<List<Sale>> getMySales({
   String? from,
   String? to,
+  String? status,
 }) async {
   final list = await api.getMySales(
     from: from,
     to: to,
+    status: status,
   );
 
   return list.map((e) => Sale.fromJson(e)).toList();

@@ -512,7 +512,9 @@ class SuccessScreen extends HookConsumerWidget {
       return const Scaffold(body: Center(child: Text("Failed to load sale")));
     }
 
+
     final Sale sale = saleSnapshot.data!;
+    print("🔥 SUCCESS SCREEN sale.customerTin = ${sale.customerTin}");
 
     final String paymentLabel = sale.payments.isNotEmpty
         ? sale.payments.first.method.toUpperCase()
@@ -579,6 +581,7 @@ class SuccessScreen extends HookConsumerWidget {
         mobile: companySettings.phone,
         customerAddress: customer.address,
         customerPhone: customer.phone,
+        customerVat: sale.customerTin,
         discount: sale.discountAmount,
         invoiceNumber: sale.id.toString(),
         invoiceDate: sale.saleDate,
@@ -604,6 +607,8 @@ class SuccessScreen extends HookConsumerWidget {
     // ---------------------------
 
     void onOpenReceiptPreview() {
+      print("🔥 INSIDE PREVIEW FUNCTION sale.customerTin = ${sale.customerTin}");
+
     // 🔴 LEGAL GUARD — FAIL FAST
   if (companySettings == null ||
       companySettings.companyNameEn.isEmpty ||
@@ -642,7 +647,7 @@ class SuccessScreen extends HookConsumerWidget {
         invoiceNumber: sale.id.toString(),
         invoiceDate: sale.saleDate,
         customerName: sale.customerName,
-
+        customerVat: sale.customerTin,
         items: receiptItems,
         subTotal: subTotal,
         discount: sale.discountAmount,
@@ -653,6 +658,7 @@ class SuccessScreen extends HookConsumerWidget {
         qrPayload: 'Invoice:${sale.id}',
       );
 
+print("🔥 RECEIPT VAT = ${sale.customerTin}");
       Navigator.push(
         context,
         MaterialPageRoute(

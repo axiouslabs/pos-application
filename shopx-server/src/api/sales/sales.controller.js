@@ -20,8 +20,6 @@ exports.getSaleById = asyncHandler(async (req, res) => {
   res.json(invoice);
 });
 
-
-
 // exports.getAllSales = asyncHandler(async (req, res) => {
 //   const limit = Number(req.query.limit || 20);
 //   const sales = await service.getAllSales(limit);
@@ -41,23 +39,22 @@ exports.getAllSales = asyncHandler(async (req, res) => {
   res.json(sales);
 });
 
-
 // exports.getMySales = asyncHandler(async (req, res) => {
 //   const sales = await service.getSalesBySalesperson(req.user.id);
 //   res.json(sales);
 // });
 
 exports.getMySales = asyncHandler(async (req, res) => {
-  const { from, to } = req.query;
+  const { from, to, status } = req.query;
 
   const sales = await service.getSalesBySalesperson(req.user.id, {
     from,
     to,
+    status,
   });
 
   res.json(sales);
 });
-
 exports.voidSale = asyncHandler(async (req, res) => {
   const saleId = req.params.id;
 
@@ -68,7 +65,6 @@ exports.voidSale = asyncHandler(async (req, res) => {
     result,
   });
 });
-
 
 exports.reviseSale = asyncHandler(async (req, res) => {
   const saleId = req.params.id;

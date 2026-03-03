@@ -94,7 +94,8 @@ customerTin: saleData["customer_tin"],
 
     totalAmount: double.tryParse(saleData["total_amount"].toString()) ?? 0,
     paymentStatus: saleData["payment_status"] ?? "paid",
-    saleDate: DateTime.tryParse(saleData["sale_date"]) ?? DateTime.now(),
+    // saleDate: DateTime.tryParse(saleData["sale_date"]) ?? DateTime.now(),
+    saleDate: DateTime.parse(saleData["sale_date"]).toLocal(),
 saleStatus: (saleData["sale_status"] ?? "completed").toLowerCase(),
   );
 }
