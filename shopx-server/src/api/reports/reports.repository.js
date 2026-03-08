@@ -14,13 +14,15 @@ SELECT
 AND s2.sale_date < ($2::date + INTERVAL '1 day')
       AND s2.payment_status = 'paid'
       AND s2.sale_status != 'voided'
+      AND (s2.sale_type IS NULL OR s2.sale_type != 'revised')
   ) AS units,
   AVG(s.total_amount) AS avg_value
 FROM sales s
 WHERE s.sale_date >= $1
 AND s.sale_date < ($2::date + INTERVAL '1 day')
   AND s.payment_status = 'paid'
-  AND s.sale_status != 'voided';
+  AND s.sale_status != 'voided'
+  AND (s.sale_type IS NULL OR s.sale_type != 'revised');
 
   `,
     [start, end],
@@ -38,6 +40,7 @@ AND s.sale_date < ($2::date + INTERVAL '1 day')
   AND s.sale_date < ($2::date + INTERVAL '1 day')
   AND s.payment_status = 'paid'
   AND s.sale_status != 'voided'
+  AND (s.sale_type IS NULL OR s.sale_type != 'revised')
   GROUP BY u.id, u.username
   ORDER BY revenue DESC;
 
@@ -68,6 +71,7 @@ exports.getSalesmanPerformance = async (start, end) => {
     AND s2.sale_date < ($2::date + INTERVAL '1 day')
         AND s2.payment_status = 'paid'
         AND s2.sale_status != 'voided'
+        AND (s2.sale_type IS NULL OR s2.sale_type != 'revised')
     )
   ) AS units
 FROM sales s
@@ -78,6 +82,7 @@ WHERE s.sale_date >= $1
 AND s.sale_date < ($2::date + INTERVAL '1 day')
   AND s.payment_status = 'paid'
   AND s.sale_status != 'voided'
+  AND (s.sale_type IS NULL OR s.sale_type != 'revised')
 GROUP BY u.id, u.username
 ORDER BY revenue DESC;
 
@@ -105,6 +110,7 @@ exports.getProductSales = async (start, end) => {
 AND s.sale_date < ($2::date + INTERVAL '1 day')
 AND s.payment_status = 'paid'
 AND s.sale_status != 'voided'
+AND (s.sale_type IS NULL OR s.sale_type != 'revised')
     GROUP BY p.name
     ORDER BY revenue DESC;
   `,
@@ -142,6 +148,7 @@ exports.getProductPerformance = async (start, end, salespersonId = null) => {
   AND s.sale_date < ($2::date + INTERVAL '1 day')
   AND s.payment_status = 'paid'
   AND s.sale_status != 'voided'
+  AND (s.sale_type IS NULL OR s.sale_type != 'revised')
     ${filter}
     GROUP BY p.id, p.name
     ORDER BY units_sold DESC;
@@ -152,22 +159,17 @@ exports.getProductPerformance = async (start, end, salespersonId = null) => {
   return rows.rows;
 };
 
-
-
-
-
-
 // exports.getCustomerPerformance = async (start, end) => {
 //   const rows = await db.query(
 //     `
-//   SELECT 
+//   SELECT
 //   c.name AS customer,
 //   SUM(sa.total_amount) AS revenue,
 //   COUNT(sa.id) AS orders,
 //   SUM(si.quantity) AS units
 // FROM sales sa
 // LEFT JOIN sale_items si ON si.sale_id = sa.id
-// JOIN customers c 
+// JOIN customers c
 //   ON sa.customer_id = c.id
 //  AND c.is_active = true
 // WHERE sa.sale_date >= $1
@@ -183,7 +185,6 @@ exports.getProductPerformance = async (start, end, salespersonId = null) => {
 
 //   return rows.rows;
 // };
-
 
 exports.getCustomerPerformance = async (start, end) => {
   const rows = await db.query(
@@ -209,17 +210,16 @@ exports.getCustomerPerformance = async (start, end) => {
       AND sa.sale_date < ($2::date + INTERVAL '1 day')
       AND sa.payment_status = 'paid'
       AND sa.sale_status != 'voided'
+       AND (sa.sale_type IS NULL OR sa.sale_type != 'revised')
 
     GROUP BY c.name
     ORDER BY revenue DESC;
     `,
-    [start, end]
+    [start, end],
   );
 
   return rows.rows;
 };
-
-
 
 /*
 const db = require("../../config/db");
