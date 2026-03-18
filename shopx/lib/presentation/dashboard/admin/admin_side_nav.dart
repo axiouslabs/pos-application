@@ -3,6 +3,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:shopx/application/auth/auth_notifier.dart';
 import 'package:shopx/core/constants.dart';
 import 'package:shopx/presentation/dashboard/admin/admin_dashboard.dart';
+import 'package:shopx/presentation/dashboard/admin/pages/bills/admin_customer_bills_selector_page.dart';
 import 'package:shopx/presentation/dashboard/admin/pages/customer/admin_customer_list_page.dart';
 import 'package:shopx/presentation/dashboard/admin/pages/productPerformance/product_performance.dart';
 import 'package:shopx/presentation/dashboard/admin/pages/products/product_list_page.dart';
@@ -61,6 +62,12 @@ final selectedIndex = adminNavIndex.value;
   'title': 'Product Performance',
   'icon': Icons.inventory_2_outlined,
   'builder': (context) => const ProductPerformancePage(),
+},
+
+{
+  'title': 'Bills',
+  'icon': Icons.receipt,
+  'builder': (context) => const AdminCustomerBillsSelectorPage(),
 },
 
 

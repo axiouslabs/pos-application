@@ -76,26 +76,40 @@ class SalesRepository {
   }
 
   // ADMIN
-  // Future<List<Sale>> getAdminSales() async {
-  //   final list = await api.getAdminSales();
-  //   return list.map((e) => Sale.fromJson(e)).toList();
-  // }
 
   Future<List<Sale>> getAdminSales({
   String? from,
   String? to,
   String? salesperson,
   String? status,
+  int? customerId,
 }) async {
   final list = await api.getAdminSales(
     from: from,
     to: to,
     salesperson: salesperson,
     status: status,
+    customerId: customerId,
   );
 
   return list.map((e) => Sale.fromJson(e)).toList();
 }
+  
+//   Future<List<Sale>> getAdminSales({
+//   String? from,
+//   String? to,
+//   String? salesperson,
+//   String? status,
+// }) async {
+//   final list = await api.getAdminSales(
+//     from: from,
+//     to: to,
+//     salesperson: salesperson,
+//     status: status,
+//   );
+
+//   return list.map((e) => Sale.fromJson(e)).toList();
+// }
 
 
 

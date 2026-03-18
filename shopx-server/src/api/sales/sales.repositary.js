@@ -135,38 +135,9 @@ exports.getSaleItems = async (client, saleId) => {
   return r.rows;
 };
 
-// BASIC LIST
 
-// exports.getAllSales = async (limit = 20) => {
-//   const r = await db.query(
-//     `
-//     SELECT
-//       s.id,
-//       s.customer_id,
-//       s.subtotal_amount,
-//       s.discount_amount,
-//       s.vat_amount,
-//       s.vat_percentage,
-//       s.total_amount,
-//       s.payment_status,
-//       s.sale_status,        -- ✅ IMPORTANT
-//       s.sale_date,
-//       u.username AS salesperson_name,
-//       c.name AS customer_name,
-//       c.phone AS customer_phone
-//     FROM sales s
-//     LEFT JOIN users u ON u.id = s.salesperson_id
-//     LEFT JOIN customers c ON c.id = s.customer_id
-//     ORDER BY s.sale_date DESC
-//     LIMIT $1
-//     `,
-//     [limit]
-//   );
-
-//   return r.rows;
-// };
-
-exports.getAllSales = async ({ from, to, salesperson, status }) => {
+// exports.getAllSales = async ({ from, to, salesperson, status }) => {
+  exports.getAllSales = async ({ from, to, salesperson, status, customerId }) => {
   let query = `
     SELECT
       s.id,
@@ -190,6 +161,12 @@ exports.getAllSales = async ({ from, to, salesperson, status }) => {
 
   const values = [];
   let index = 1;
+
+  if (customerId) {
+  query += ` AND s.customer_id = $${index}`;
+  values.push(customerId);
+  index++;
+}
 
   if (from && to) {
     query += ` AND s.sale_date >= $${index} AND s.sale_date < $${index + 1}::date + INTERVAL '1 day'`;
@@ -215,10 +192,14 @@ exports.getAllSales = async ({ from, to, salesperson, status }) => {
 
   query += ` ORDER BY s.sale_date DESC`;
 
-  // Default limit only if NO filter is applied
-  if (!from && !to && !salesperson && !status) {
-    query += ` LIMIT 20`;
-  }
+  // // Default limit only if NO filter is applied
+  // if (!from && !to && !salesperson && !status) {
+  //   query += ` LIMIT 20`;
+  // }
+
+  if (!from && !to && !salesperson && !status && !customerId) {
+  query += ` LIMIT 20`;
+}
 
   const r = await db.query(query, values);
   return r.rows;

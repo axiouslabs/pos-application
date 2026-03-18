@@ -16,17 +16,33 @@ class SalesApi {
   }
 
   // ADMIN ONLY
-  // Future<List<dynamic>> getAdminSales() async {
-  //   final res = await _dio.get("/sales");
-  //   return res.data;
-  // }
- 
+  
 
- Future<List<dynamic>> getAdminSales({
+//  Future<List<dynamic>> getAdminSales({
+//   String? from,
+//   String? to,
+//   String? salesperson,
+//   String? status,
+// }) async {
+//   final res = await _dio.get(
+//     "/sales",
+//     queryParameters: {
+//       if (from != null) "from": from,
+//       if (to != null) "to": to,
+//       if (salesperson != null) "salesperson": salesperson,
+//       if (status != null) "status": status,
+//     },
+//   );
+
+//   return res.data;
+// }
+
+Future<List<dynamic>> getAdminSales({
   String? from,
   String? to,
   String? salesperson,
   String? status,
+  int? customerId,
 }) async {
   final res = await _dio.get(
     "/sales",
@@ -35,6 +51,7 @@ class SalesApi {
       if (to != null) "to": to,
       if (salesperson != null) "salesperson": salesperson,
       if (status != null) "status": status,
+      if (customerId != null) "customerId": customerId,
     },
   );
 

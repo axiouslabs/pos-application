@@ -59,31 +59,37 @@ class SalesNotifier extends Notifier<SalesState> {
   }
 
   // ADMIN
-  // Future<void> fetchAdminSales() async {
-  //   state = state.copyWith(isLoading: true);
-  //   try {
-  //     final list = await ref.read(salesRepositoryProvider).getAdminSales();
-  //     state = state.copyWith(isLoading: false, sales: list);
-  //   } catch (e) {
-  //     state = state.copyWith(isLoading: false, error: e.toString());
-  //   }
-  // }
+ 
 
-  Future<void> fetchAdminSales({
+//   Future<void> fetchAdminSales({
+//   String? from,
+//   String? to,
+//   String? salesperson,
+//   String? status,
+// }) async {
+Future<void> fetchAdminSales({
   String? from,
   String? to,
   String? salesperson,
   String? status,
+  int? customerId,
 }) async {
   state = state.copyWith(isLoading: true);
 
   try {
+    // final list = await ref.read(salesRepositoryProvider).getAdminSales(
+    //   from: from,
+    //   to: to,
+    //   salesperson: salesperson,
+    //   status: status,
+    // );
     final list = await ref.read(salesRepositoryProvider).getAdminSales(
-      from: from,
-      to: to,
-      salesperson: salesperson,
-      status: status,
-    );
+  from: from,
+  to: to,
+  salesperson: salesperson,
+  status: status,
+  customerId: customerId,
+);
 
     state = state.copyWith(isLoading: false, sales: list);
   } catch (e) {
