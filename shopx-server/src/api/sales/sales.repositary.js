@@ -157,6 +157,7 @@ exports.getSaleItems = async (client, saleId) => {
     LEFT JOIN users u ON u.id = s.salesperson_id
     LEFT JOIN customers c ON c.id = s.customer_id
     WHERE 1=1
+    AND (s.sale_type IS NULL OR s.sale_type != 'revised')
   `;
 
   const values = [];
@@ -254,6 +255,7 @@ exports.getSalesBySalesperson = async (salespersonId, { from, to, status }) => {
     LEFT JOIN users u ON u.id = s.salesperson_id
     LEFT JOIN customers c ON c.id = s.customer_id
     WHERE s.salesperson_id = $1
+    AND (s.sale_type IS NULL OR s.sale_type != 'revised')
   `;
 
   const values = [salespersonId];
