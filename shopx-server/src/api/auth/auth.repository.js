@@ -52,6 +52,14 @@ const deleteUserById = async (id) => {
   return r.rows[0] || null;
 };
 
+// --- UPDATE PASSWORD ---
+const updatePassword = async (userId, newPassword) => {
+  await db.query(
+    "UPDATE users SET password = $1 WHERE id = $2",
+    [newPassword, userId]
+  );
+};
+
 // --- OTP SYSTEM ---
 
 // Save or update OTP for a user
@@ -134,6 +142,7 @@ module.exports = {
   getAllUsers,
   createUser,
   updateUser,
+  updatePassword,
   deleteUserById,
   saveOTP,
   findValidOTP,

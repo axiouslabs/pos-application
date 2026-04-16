@@ -84,8 +84,24 @@ const login = async ({ username, password }) => {
   const user = await repo.findUserByUsername(username);
   if (!user) throw new Error("Invalid credentials");
 
-  const match = await bcrypt.compare(password, user.password);
-  if (!match) throw new Error("Invalid credentials");
+  let isMatch = false;
+
+  // Case 1: bcrypt hashed password
+  if (user.password && user.password.startsWith("$2")) {
+    isMatch = await bcrypt.compare(password, user.password);
+  }
+  // Case 2: legacy plain-text password
+  else {
+    isMatch = password === user.password;
+
+    // Auto-migrate to bcrypt after successful login
+    if (isMatch) {
+      const newHash = await bcrypt.hash(password, 10);
+      await repo.updatePassword(user.id, newHash);
+    }
+  }
+
+  if (!isMatch) throw new Error("Invalid credentials");
 
   // 🚨 BLOCK ADMINS FROM EMPLOYEE LOGIN
   if (user.user_type === "admin") {
@@ -128,6 +144,10 @@ const login = async ({ username, password }) => {
   };
 };
 
+
+
+
+
 const loginAdmin = async ({ username, password }) => {
   if (!username || !password) throw new Error("All fields are mandatory");
 
@@ -138,8 +158,24 @@ const loginAdmin = async ({ username, password }) => {
     throw new Error("Not authorized. Only admin can login.");
   }
 
-  const match = await bcrypt.compare(password, user.password);
-  if (!match) throw new Error("Invalid credentials");
+  let isMatch = false;
+
+  // Case 1: bcrypt hashed password
+  if (user.password && user.password.startsWith("$2")) {
+    isMatch = await bcrypt.compare(password, user.password);
+  }
+  // Case 2: legacy plain-text password
+  else {
+    isMatch = password === user.password;
+
+    // Auto-migrate to bcrypt after successful login
+    if (isMatch) {
+      const newHash = await bcrypt.hash(password, 10);
+      await repo.updatePassword(user.id, newHash);
+    }
+  }
+
+  if (!isMatch) throw new Error("Invalid credentials");
 
   const accessToken = jwt.sign(
     {
@@ -169,6 +205,9 @@ const loginAdmin = async ({ username, password }) => {
     },
   };
 };
+
+
+
 
 const updateUser = async (userId, { username, email }) => {
   if (!username && !email) throw new Error("Provide username or email");
@@ -213,8 +252,24 @@ const loginOwner = async ({ username, password }) => {
   if (user.user_type !== "admin")
     throw new Error("Not authorized. Only admin can login.");
 
-  const match = await bcrypt.compare(password, user.password);
-  if (!match) throw new Error("Invalid credentials");
+  let isMatch = false;
+
+  // Case 1: bcrypt hashed password
+  if (user.password && user.password.startsWith("$2")) {
+    isMatch = await bcrypt.compare(password, user.password);
+  }
+  // Case 2: legacy plain-text password
+  else {
+    isMatch = password === user.password;
+
+    // Auto-migrate to bcrypt after successful login
+    if (isMatch) {
+      const newHash = await bcrypt.hash(password, 10);
+      await repo.updatePassword(user.id, newHash);
+    }
+  }
+
+  if (!isMatch) throw new Error("Invalid credentials");
 
   // Temporary short-lived token (5 min)
   const tempToken = jwt.sign({ id: user.id }, process.env.ACCESS_TOKEN_SECRET, {
