@@ -4,8 +4,8 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 // The base URL of your server — used to verify actual reachability
-const _serverUrl = "http://10.114.76.32:5050/api/";
-
+// const _serverUrl = "http://10.114.76.32:5050/api/";
+const _serverUrl = "http://sellops.cloud:5000/api/";
 final connectivityProvider = StreamProvider<bool>((ref) async* {
   final connectivity = Connectivity();
 

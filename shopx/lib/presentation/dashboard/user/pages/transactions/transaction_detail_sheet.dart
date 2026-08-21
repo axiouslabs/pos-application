@@ -202,10 +202,29 @@ class TransactionDetailSheet extends HookConsumerWidget {
               label: "Mark as Fully Paid",
               color: Colors.green,
               onTap: () async {
-                await ref
-                    .read(paymentsNotifierProvider.notifier)
-                    .markPaymentAsPaid(invoice.id);
-                if (context.mounted) Navigator.pop(context);
+                try {
+                  await ref
+                      .read(paymentsNotifierProvider.notifier)
+                      .markPaymentAsPaid(invoice.id);
+                  // Refresh so the sheet reflects the new PAID status
+                  await ref
+                      .read(salesNotifierProvider.notifier)
+                      .fetchSaleById(invoice.id);
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text("Invoice marked as paid"),
+                        backgroundColor: Colors.green,
+                      ),
+                    );
+                  }
+                } catch (e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text("Error: $e"), backgroundColor: Colors.red),
+                    );
+                  }
+                }
               },
             ),
           ],
@@ -543,7 +562,20 @@ class TransactionDetailSheet extends HookConsumerWidget {
                         method: selectedMethod,
                       );
 
-                  if (context.mounted) Navigator.pop(context);
+                  // Refresh so the sheet shows the updated partial/paid status
+                  if (context.mounted) {
+                    await ref
+                        .read(salesNotifierProvider.notifier)
+                        .fetchSaleById(s.id);
+                  }
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text("Payment recorded"),
+                        backgroundColor: Colors.green,
+                      ),
+                    );
+                  }
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF1D72D6),
@@ -584,10 +616,30 @@ class TransactionDetailSheet extends HookConsumerWidget {
           ElevatedButton(
             onPressed: () async {
               Navigator.of(ctx).pop();
-              await ref
-                  .read(paymentsNotifierProvider.notifier)
-                  .markPaymentAsPending(s.id);
-              if (context.mounted) Navigator.pop(context);
+              try {
+                await ref
+                    .read(paymentsNotifierProvider.notifier)
+                    .markPaymentAsPending(s.id);
+                if (context.mounted) {
+                  await ref
+                      .read(salesNotifierProvider.notifier)
+                      .fetchSaleById(s.id);
+                }
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text("Invoice marked as unpaid"),
+                      backgroundColor: Color(0xFFF59E0B),
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text("Error: $e"), backgroundColor: Colors.red),
+                  );
+                }
+              }
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFFF59E0B),
@@ -674,13 +726,33 @@ class TransactionDetailSheet extends HookConsumerWidget {
                     return;
                   }
                   Navigator.of(ctx).pop();
-                  await ref
-                      .read(paymentsNotifierProvider.notifier)
-                      .markPaymentAsPartial(
-                        saleId: s.id,
-                        paidAmount: amount,
+                  try {
+                    await ref
+                        .read(paymentsNotifierProvider.notifier)
+                        .markPaymentAsPartial(
+                          saleId: s.id,
+                          paidAmount: amount,
+                        );
+                    if (context.mounted) {
+                      await ref
+                          .read(salesNotifierProvider.notifier)
+                          .fetchSaleById(s.id);
+                    }
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text("Invoice marked as partially paid"),
+                          backgroundColor: Color(0xFFF97316),
+                        ),
                       );
-                  if (context.mounted) Navigator.pop(context);
+                    }
+                  } catch (e) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text("Error: $e"), backgroundColor: Colors.red),
+                      );
+                    }
+                  }
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFFF97316),

@@ -7,6 +7,23 @@ import 'package:shopx/domain/sales/sale.dart';
 import 'package:shopx/presentation/dashboard/user/pages/transactions/transaction_detail_sheet.dart';
 import 'package:shopx/widget/transaction/build_transaction_card.dart';
 
+// Represents either a sale entry or a payment-received entry in the timeline
+class _TimelineEntry {
+  final DateTime date;
+  final Sale sale;
+  final bool isPaymentEntry; // true = payment received event
+  final double? paymentAmount;
+  final String? paymentMethod;
+
+  const _TimelineEntry({
+    required this.date,
+    required this.sale,
+    this.isPaymentEntry = false,
+    this.paymentAmount,
+    this.paymentMethod,
+  });
+}
+
 class TransactionHistoryPage extends HookConsumerWidget {
   const TransactionHistoryPage({super.key});
 
@@ -47,7 +64,7 @@ class TransactionHistoryPage extends HookConsumerWidget {
   final selectedStatus = useState<String>('ALL');
 
     final groupedSales = useMemoized(() {
-      final Map<String, List<Sale>> map = {};
+      final Map<String, List<_TimelineEntry>> map = {};
 
       // 1️⃣ FILTER BY STATUS
       final filteredSales = sales.where((sale) {
@@ -55,14 +72,39 @@ class TransactionHistoryPage extends HookConsumerWidget {
         return sale.paymentStatus.toUpperCase() == selectedStatus.value;
       }).toList();
 
-      // 2️⃣ SORT DESC
-      filteredSales.sort((a, b) => b.saleDate.compareTo(a.saleDate));
+      // 2️⃣ Build timeline entries:
+      //    - One entry per sale (on the sale's creation date)
+      //    - One entry per payment received (on the payment's date, if different from sale date)
+      final List<_TimelineEntry> entries = [];
 
-      // 3️⃣ GROUP BY DATE
-      for (var sale in filteredSales) {
-        final dateKey = DateFormat('EEEE, MMMM d, yyyy').format(sale.saleDate);
+      for (final sale in filteredSales) {
+        // Sale creation entry
+        entries.add(_TimelineEntry(date: sale.saleDate, sale: sale));
+
+        // Payment received entries — only add if payment date differs from sale date
+        for (final payment in sale.payments) {
+          final saleDay = DateFormat('yyyy-MM-dd').format(sale.saleDate);
+          final payDay = DateFormat('yyyy-MM-dd').format(payment.createdAt);
+          if (payDay != saleDay) {
+            entries.add(_TimelineEntry(
+              date: payment.createdAt,
+              sale: sale,
+              isPaymentEntry: true,
+              paymentAmount: payment.amount,
+              paymentMethod: payment.method,
+            ));
+          }
+        }
+      }
+
+      // 3️⃣ SORT DESC
+      entries.sort((a, b) => b.date.compareTo(a.date));
+
+      // 4️⃣ GROUP BY DATE
+      for (final entry in entries) {
+        final dateKey = DateFormat('EEEE, MMMM d, yyyy').format(entry.date);
         map.putIfAbsent(dateKey, () => []);
-        map[dateKey]!.add(sale);
+        map[dateKey]!.add(entry);
       }
 
       return map;
@@ -231,13 +273,16 @@ class TransactionHistoryPage extends HookConsumerWidget {
                     itemCount: groupedSales.keys.length,
                     itemBuilder: (context, index) {
                       final dateKey = groupedSales.keys.elementAt(index);
-                      final daySales = groupedSales[dateKey]!;
+                      final dayEntries = groupedSales[dateKey]!;
 
-                      // Calculate Total for this day
-                      final double dayTotal = daySales.fold(
-                        0,
-                        (sum, item) => sum + item.totalAmount,
-                      );
+                      // Daily total: sum sale amounts for sale entries,
+                      // and payment amounts for payment entries
+                      final double dayTotal = dayEntries.fold(0, (sum, entry) {
+                        if (entry.isPaymentEntry) {
+                          return sum + (entry.paymentAmount ?? 0);
+                        }
+                        return sum + entry.sale.totalAmount;
+                      });
 
                       return Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -252,7 +297,7 @@ class TransactionHistoryPage extends HookConsumerWidget {
                                   dateKey,
                                   style: const TextStyle(
                                     fontSize: 13,
-                                    color: Color(0xFF536471), // Dark Grey
+                                    color: Color(0xFF536471),
                                     fontWeight: FontWeight.w500,
                                   ),
                                 ),
@@ -260,9 +305,7 @@ class TransactionHistoryPage extends HookConsumerWidget {
                                   "SAR ${dayTotal.toStringAsFixed(2)}",
                                   style: const TextStyle(
                                     fontSize: 14,
-                                    color: Color(
-                                      0xFF1F2937,
-                                    ), // Darker Black/Blue
+                                    color: Color(0xFF1F2937),
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),
@@ -270,20 +313,28 @@ class TransactionHistoryPage extends HookConsumerWidget {
                             ),
                           ),
 
-                          // -- Transactions for this date --
-                          ...daySales
-                              .map(
-                                (sale) => GestureDetector(
-                                  onTap: () {
-                                    _openTransactionDetails(context, ref, sale);
-                                  },
-                                  child: buildTransactionCard(
-                                    sale,
-                                    primaryBlue,
-                                  ),
+                          // -- Entries for this date --
+                          ...dayEntries.map((entry) {
+                            if (entry.isPaymentEntry) {
+                              // Payment received card
+                              return GestureDetector(
+                                onTap: () => _openTransactionDetails(
+                                    context, ref, entry.sale),
+                                child: _buildPaymentReceivedCard(
+                                  entry,
+                                  primaryBlue,
                                 ),
-                              )
-                              .toList(),
+                              );
+                            }
+                            return GestureDetector(
+                              onTap: () => _openTransactionDetails(
+                                  context, ref, entry.sale),
+                              child: buildTransactionCard(
+                                entry.sale,
+                                primaryBlue,
+                              ),
+                            );
+                          }),
                         ],
                       );
                     },
@@ -327,5 +378,95 @@ class TransactionHistoryPage extends HookConsumerWidget {
 
     // ✅ REFRESH AFTER MODAL CLOSES
     ref.read(salesNotifierProvider.notifier).fetchMySales();
+  }
+
+  // ── Payment received card (shown on the date payment was collected) ────────
+  Widget _buildPaymentReceivedCard(_TimelineEntry entry, Color primaryBlue) {
+    final timeStr = DateFormat('hh:mm a').format(entry.date);
+    final trxId = "#TRX${entry.sale.id.toString().padLeft(10, '0')}";
+    final method = (entry.paymentMethod ?? 'cash').toLowerCase();
+    final methodIcon =
+        method == 'card' ? Icons.credit_card : Icons.payments_outlined;
+    const receivedColor = Color(0xFF16A34A); // green
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: receivedColor.withOpacity(0.35), width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 12,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          // Icon badge
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: receivedColor.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(methodIcon, color: receivedColor, size: 20),
+          ),
+          const SizedBox(width: 12),
+          // Info
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  "Payment Received",
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: receivedColor,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  "SAR ${(entry.paymentAmount ?? 0).toStringAsFixed(2)}  •  $timeStr",
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF1F2937),
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  "$trxId  •  ${entry.sale.customerName}",
+                  style: const TextStyle(fontSize: 11, color: Color(0xFF9CA3AF)),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          // Method badge
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: receivedColor.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              method.toUpperCase(),
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+                color: receivedColor,
+                letterSpacing: 0.4,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

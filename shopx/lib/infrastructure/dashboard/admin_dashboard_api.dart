@@ -12,7 +12,7 @@ class AdminDashboardApi {
   AdminDashboardApi(this._dio);
 
   Future<Map<String, dynamic>> fetchDashboard() async {
-    final res = await _dio.get("/dashboard");
+    final res = await _dio.get("dashboard");
     return res.data;
   }
 }

@@ -19,27 +19,27 @@ class ProductApi {
 
   // POST → Add Product
   Future<int> createProduct(Product product) async {
-    final res = await _dio.post("/products", data: product.toJson());
+    final res = await _dio.post("products", data: product.toJson());
 
     return res.data["id"]; // backend returns product id
   }
 
   // GET → Fetch All Products
   Future<List<dynamic>> getProducts() async {
-    final response = await _dio.get("/products");
+    final response = await _dio.get("products");
     return response.data; // returns a list of JSON objects
   }
 
   // GET → Fetch single product by ID
   Future<Map<String, dynamic>> getProductById(String id) async {
-    final response = await _dio.get("/products/$id");
+    final response = await _dio.get("products/$id");
     return response.data;
   }
 
   // PUT → Update Product  (metadata incl. name_ar)
   Future<void> updateProduct(String id, Map<String, dynamic> data) async {
     await _dio.put(
-      "/products/$id",
+      "products/$id",
       data: data, // name, price, category, code, vat ONLY
     );
   }
@@ -51,14 +51,14 @@ class ProductApi {
     String reason = "admin-adjust",
   }) async {
     await _dio.post(
-      "/products/$productId/adjust-stock",
+      "products/$productId/adjust-stock",
       data: {"quantity": quantityChange, "reason": reason},
     );
   }
 
   // DELETE → Remove Product by ID
   Future<void> deleteProduct(String id) async {
-    await _dio.delete("/products/$id");
+    await _dio.delete("products/$id");
   }
 
   Future<void> uploadImages(int productId, List<Uint8List> images) async {
@@ -73,6 +73,6 @@ class ProductApi {
       );
     }
 
-    await _dio.post("/products/$productId/images", data: formData);
+    await _dio.post("products/$productId/images", data: formData);
   }
 }

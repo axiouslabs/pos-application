@@ -63,3 +63,28 @@ exports.addPartialPayment = asyncHandler(async (req, res) => {
 
   res.json(result);
 });
+
+// ✅ Downgrade paid → pending (clears all payments for this sale)
+exports.markPaymentAsPending = asyncHandler(async (req, res) => {
+  const { saleId } = req.params;
+  const result = await service.markPaymentAsPending(parseInt(saleId));
+  res.json({ message: "Payment status set to PENDING", result });
+});
+
+// ✅ Downgrade paid → partially_paid (retains a specific paid amount)
+exports.markPaymentAsPartial = asyncHandler(async (req, res) => {
+  const { saleId } = req.params;
+  const { paid_amount } = req.body;
+
+  if (paid_amount == null || paid_amount <= 0) {
+    res.status(400);
+    throw new Error("paid_amount must be greater than 0");
+  }
+
+  const result = await service.markPaymentAsPartial({
+    saleId: parseInt(saleId),
+    paidAmount: parseFloat(paid_amount),
+  });
+
+  res.json(result);
+});
