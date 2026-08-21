@@ -18,7 +18,6 @@ class AdminTransactionHistoryPage extends HookConsumerWidget {
     useEffect(() {
       Future.microtask(() {
         ref.read(salesNotifierProvider.notifier).fetchAdminSales();
-        
       });
       return null;
     }, []);
@@ -63,7 +62,6 @@ class AdminTransactionHistoryPage extends HookConsumerWidget {
                 filter.value = result;
               }
             },
-
             icon: Icon(Icons.tune, color: primaryBlue, size: 20),
             label: Text(
               "Filter",
@@ -93,11 +91,9 @@ class AdminTransactionHistoryPage extends HookConsumerWidget {
     List<Sale> sales,
     TransactionFilterResult? filter,
   ) {
-  var filteredSales = List<Sale>.from(sales);
-
+    var filteredSales = List<Sale>.from(sales);
 
     if (filter != null) {
-      // Salesperson filter
       if (filter.salespersonName != null) {
         filteredSales = filteredSales
             .where(
@@ -107,22 +103,26 @@ class AdminTransactionHistoryPage extends HookConsumerWidget {
             )
             .toList();
       }
-
       // Status filter
       if (filter.status != 'ALL') {
-        filteredSales = filteredSales
-            .where((s) => s.paymentStatus.toUpperCase() == filter.status)
-            .toList();
+        if (filter.status == 'CANCELED') {
+          filteredSales = filteredSales.where((s) {
+            final st = s.paymentStatus.toUpperCase();
+            return st == 'VOID' || st == 'VOIDED' || st == 'CANCELED';
+          }).toList();
+        } else {
+          filteredSales = filteredSales
+              .where((s) => s.paymentStatus.toUpperCase() == filter.status)
+              .toList();
+        }
       }
 
-      // From date
       if (filter.fromDate != null) {
         filteredSales = filteredSales
             .where((s) => !s.saleDate.isBefore(filter.fromDate!))
             .toList();
       }
 
-      // To date
       if (filter.toDate != null) {
         filteredSales = filteredSales
             .where((s) => !s.saleDate.isAfter(filter.toDate!))
@@ -154,7 +154,6 @@ class AdminTransactionHistoryPage extends HookConsumerWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // DATE HEADER
             Padding(
               padding: const EdgeInsets.only(bottom: 16, top: 8),
               child: Row(
@@ -180,10 +179,11 @@ class AdminTransactionHistoryPage extends HookConsumerWidget {
               ),
             ),
 
-            // TRANSACTION CARDS
             ...dailySales.map(
               (sale) => _buildTransactionCard(context, ref, sale, () async {
-                await ref.read(salesNotifierProvider.notifier).fetchAdminSales();
+                await ref
+                    .read(salesNotifierProvider.notifier)
+                    .fetchAdminSales();
               }),
             ),
 
@@ -220,11 +220,13 @@ class AdminTransactionHistoryPage extends HookConsumerWidget {
     final timeString = DateFormat('hh:mm a').format(sale.saleDate);
     final trxId = "#TRX${sale.id.toString().padLeft(10, '0')}";
     final statusColor = _getStatusColor(sale.paymentStatus);
+    final statusText = _getStatusDisplayText(sale.paymentStatus);
 
     final showActions = sale.paymentStatus.toUpperCase() == 'PENDING' ||
         sale.paymentStatus.toUpperCase() == 'PARTIALLY_PAID';
     final isVoided = sale.paymentStatus.toUpperCase() == 'VOID' ||
-        sale.paymentStatus.toUpperCase() == 'VOIDED';
+        sale.paymentStatus.toUpperCase() == 'VOIDED' ||
+        sale.paymentStatus.toUpperCase() == 'CANCELED';
 
     return InkWell(
       borderRadius: BorderRadius.circular(20),
@@ -260,7 +262,6 @@ class AdminTransactionHistoryPage extends HookConsumerWidget {
                     onRefresh();
                   }
                 : null,
-            // downgrade: paid → pending
             onMarkAsPending: sale.paymentStatus.toUpperCase() == 'PAID'
                 ? () async {
                     await ref
@@ -272,7 +273,6 @@ class AdminTransactionHistoryPage extends HookConsumerWidget {
                     onRefresh();
                   }
                 : null,
-            // downgrade: paid → partially paid
             onMarkAsPartial: sale.paymentStatus.toUpperCase() == 'PAID'
                 ? (paidAmt) async {
                     await ref
@@ -287,14 +287,27 @@ class AdminTransactionHistoryPage extends HookConsumerWidget {
                     onRefresh();
                   }
                 : null,
+            onReversePayment:
+                sale.paymentStatus.toUpperCase() == 'PARTIALLY_PAID'
+                    ? () async {
+                        await ref
+                            .read(paymentsNotifierProvider.notifier)
+                            .reversePartialPayment(sale.id);
+                        if (dialogContext.mounted) {
+                          Navigator.of(dialogContext).pop();
+                        }
+                        onRefresh();
+                      }
+                    : null,
             onVoid: isVoided
                 ? null
                 : () async {
-                    await ref
-                        .read(salesNotifierProvider.notifier)
-                        .voidSale(sale.id);
-                    if (dialogContext.mounted) {
-                      Navigator.of(dialogContext).pop();
+                    try {
+                      await ref
+                          .read(salesNotifierProvider.notifier)
+                          .voidSale(sale.id);
+                    } catch (e) {
+                      rethrow;
                     }
                     onRefresh();
                   },
@@ -351,7 +364,7 @@ class AdminTransactionHistoryPage extends HookConsumerWidget {
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Text(
-                sale.paymentStatus.toUpperCase().replaceAll('_', ' '),
+                statusText,
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 12,
@@ -366,6 +379,25 @@ class AdminTransactionHistoryPage extends HookConsumerWidget {
     );
   }
 
+  // ================= STATUS DISPLAY =================
+
+  String _getStatusDisplayText(String status) {
+    switch (status.toUpperCase()) {
+      case 'PAID':
+        return 'PAID';
+      case 'PENDING':
+        return 'PENDING';
+      case 'PARTIALLY_PAID':
+        return 'PARTIAL';
+      case 'VOID':
+      case 'VOIDED':
+      case 'CANCELED':
+        return 'CANCELED';
+      default:
+        return status.toUpperCase().replaceAll('_', ' ');
+    }
+  }
+
   // ================= STATUS COLOR =================
 
   Color _getStatusColor(String status) {
@@ -378,6 +410,7 @@ class AdminTransactionHistoryPage extends HookConsumerWidget {
         return const Color(0xFFF97316);
       case 'VOID':
       case 'VOIDED':
+      case 'CANCELED':
         return const Color(0xFF9CA3AF);
       default:
         return const Color(0xFF1D72D6);

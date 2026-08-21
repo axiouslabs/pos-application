@@ -742,7 +742,7 @@ class _BillsList extends HookConsumerWidget {
     final showUpgrade =
         status == 'PENDING' || status == 'PARTIALLY_PAID';
     final showDowngrade = status == 'PAID';
-    final isVoided = status == 'VOID' || status == 'VOIDED';
+    final isVoided = status == 'VOID' || status == 'VOIDED' || status == 'CANCELED';
 
     showDialog(
       context: context,
@@ -800,15 +800,28 @@ class _BillsList extends HookConsumerWidget {
                 onRefresh();
               }
             : null,
+        // reverse partial → pending
+        onReversePayment: status == 'PARTIALLY_PAID'
+            ? () async {
+                await ref
+                    .read(paymentsNotifierProvider.notifier)
+                    .reversePartialPayment(sale.id);
+                if (dialogContext.mounted) {
+                  Navigator.of(dialogContext).pop();
+                }
+                onRefresh();
+              }
+            : null,
         // cancel
         onVoid: isVoided
             ? null
             : () async {
-                await ref
-                    .read(salesNotifierProvider.notifier)
-                    .voidSale(sale.id);
-                if (dialogContext.mounted) {
-                  Navigator.of(dialogContext).pop();
+                try {
+                  await ref
+                      .read(salesNotifierProvider.notifier)
+                      .voidSale(sale.id);
+                } catch (e) {
+                  rethrow;
                 }
                 onRefresh();
               },
@@ -918,6 +931,7 @@ class _BillCard extends StatelessWidget {
         return const Color(0xFFF97316);
       case 'VOID':
       case 'VOIDED':
+      case 'CANCELED':
         return const Color(0xFF9CA3AF);
       default:
         return const Color(0xFF9CA3AF);
@@ -934,7 +948,8 @@ class _BillCard extends StatelessWidget {
         return 'PARTIAL';
       case 'VOID':
       case 'VOIDED':
-        return 'CANCELLED';
+      case 'CANCELED':
+        return 'CANCELED';
       default:
         return s.toUpperCase().replaceAll('_', ' ');
     }

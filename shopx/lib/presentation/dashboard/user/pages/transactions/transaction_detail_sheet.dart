@@ -3,6 +3,7 @@ import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:shopx/application/payments/payments_notifier.dart';
+import 'package:shopx/application/payments/payments_state.dart';
 import 'package:shopx/application/sales/sales_notifier.dart';
 import 'package:shopx/domain/config/company_config.dart';
 import 'package:shopx/domain/reciept/receipt_data.dart';
@@ -195,9 +196,20 @@ class TransactionDetailSheet extends HookConsumerWidget {
               label: "Record Partial Payment",
               color: primaryBlue,
               outlined: true,
-              onTap: () => _showRecordPaymentDialog(context, ref, invoice),
+              onTap: () => _showRecordPaymentDialog(context, ref, invoice, paymentsState.summary),
             ),
             const SizedBox(height: 12),
+            // Show "Reverse Payment" only when there's something already paid
+            if (isPartiallyPaid) ...[
+              _actionButton(
+                label: "Reverse Payment",
+                color: Colors.red,
+                outlined: true,
+                icon: Icons.undo_rounded,
+                onTap: () => _confirmReversePayment(context, ref, invoice),
+              ),
+              const SizedBox(height: 12),
+            ],
             _actionButton(
               label: "Mark as Fully Paid",
               color: Colors.green,
@@ -476,9 +488,17 @@ class TransactionDetailSheet extends HookConsumerWidget {
     BuildContext context,
     WidgetRef ref,
     Sale s,
+    PaymentSummary? summary,
   ) {
     final amountController = TextEditingController();
     String selectedMethod = "cash";
+
+    // Calculate already-paid and remaining from summary or sale payments
+    final alreadyPaid = summary?.paidAmount ??
+        s.payments
+            .where((p) => p.method != 'reversed')
+            .fold<double>(0.0, (sum, p) => sum + p.amount);
+    final remaining = s.totalAmount - alreadyPaid;
 
     showDialog(
       context: context,
@@ -494,38 +514,73 @@ class TransactionDetailSheet extends HookConsumerWidget {
             ),
             content: Column(
               mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // ── Summary box ──────────────────────────────────────
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF3F4F6),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Column(
+                    children: [
+                      _summaryLine("Total Amount",
+                          "SAR ${s.totalAmount.toStringAsFixed(2)}",
+                          bold: true),
+                      const SizedBox(height: 4),
+                      _summaryLine("Already Paid",
+                          "SAR ${alreadyPaid.toStringAsFixed(2)}",
+                          color: Colors.green),
+                      const Divider(height: 12),
+                      _summaryLine("Remaining Balance",
+                          "SAR ${remaining.toStringAsFixed(2)}",
+                          color: Colors.red, bold: true),
+                    ],
+                  ),
+                ),
+                // ── Amount field ─────────────────────────────────────
                 TextField(
                   controller: amountController,
                   keyboardType:
                       const TextInputType.numberWithOptions(decimal: true),
                   decoration: InputDecoration(
-                    labelText: "Amount (SAR)",
-                    hintText: "Enter payment amount",
+                    labelText: "Payment Amount (SAR)",
+                    hintText: "Max: ${remaining.toStringAsFixed(2)}",
                     filled: true,
-                    fillColor: const Color(0xFFF3F4F6),
+                    fillColor: Colors.white,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none,
+                      borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
                     ),
                   ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 14),
+                // ── Method dropdown ──────────────────────────────────
                 DropdownButtonFormField<String>(
                   value: selectedMethod,
                   decoration: InputDecoration(
                     labelText: "Payment Method",
                     filled: true,
-                    fillColor: const Color(0xFFF3F4F6),
+                    fillColor: Colors.white,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none,
+                      borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
                     ),
                   ),
                   items: const [
                     DropdownMenuItem(value: "cash", child: Text("Cash")),
-                    DropdownMenuItem(
-                        value: "card", child: Text("Card / Bank")),
+                    DropdownMenuItem(value: "card", child: Text("Card / Bank")),
                   ],
                   onChanged: (val) {
                     if (val != null) {
@@ -546,35 +601,52 @@ class TransactionDetailSheet extends HookConsumerWidget {
                       double.tryParse(amountController.text.trim());
                   if (amount == null || amount <= 0) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                          content: Text("Enter a valid amount")),
+                      const SnackBar(content: Text("Enter a valid amount")),
+                    );
+                    return;
+                  }
+                  if (amount > remaining + 0.001) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                            "Amount exceeds remaining balance of SAR ${remaining.toStringAsFixed(2)}"),
+                        backgroundColor: Colors.red,
+                      ),
                     );
                     return;
                   }
                   Navigator.of(ctx).pop();
-
-                  await ref
-                      .read(paymentsNotifierProvider.notifier)
-                      .addPartialPayment(
-                        saleId: s.id,
-                        customerId: s.customerId,
-                        amount: amount,
-                        method: selectedMethod,
-                      );
-
-                  // Refresh so the sheet shows the updated partial/paid status
-                  if (context.mounted) {
+                  try {
                     await ref
-                        .read(salesNotifierProvider.notifier)
-                        .fetchSaleById(s.id);
-                  }
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text("Payment recorded"),
-                        backgroundColor: Colors.green,
-                      ),
-                    );
+                        .read(paymentsNotifierProvider.notifier)
+                        .addPartialPayment(
+                          saleId: s.id,
+                          customerId: s.customerId,
+                          amount: amount,
+                          method: selectedMethod,
+                        );
+                    // Always re-fetch so status chip + buttons reflect new state
+                    if (context.mounted) {
+                      await ref
+                          .read(salesNotifierProvider.notifier)
+                          .fetchSaleById(s.id);
+                    }
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text("Payment recorded"),
+                          backgroundColor: Colors.green,
+                        ),
+                      );
+                    }
+                  } catch (e) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                            content: Text("Error: $e"),
+                            backgroundColor: Colors.red),
+                      );
+                    }
                   }
                 },
                 style: ElevatedButton.styleFrom(
@@ -591,6 +663,96 @@ class TransactionDetailSheet extends HookConsumerWidget {
             ],
           );
         },
+      ),
+    );
+  }
+
+  // ── Summary line helper (used inside dialog) ──────────────────────────────
+  Widget _summaryLine(String label, String value,
+      {Color? color, bool bold = false}) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(label,
+            style: TextStyle(
+              fontSize: 13,
+              color: color ?? const Color(0xFF374151),
+              fontWeight: bold ? FontWeight.bold : FontWeight.normal,
+            )),
+        Text(value,
+            style: TextStyle(
+              fontSize: 13,
+              color: color ?? const Color(0xFF374151),
+              fontWeight: bold ? FontWeight.bold : FontWeight.w500,
+            )),
+      ],
+    );
+  }
+
+  // ── Confirm: reverse partial payment → pending ────────────────────────────
+  void _confirmReversePayment(BuildContext context, WidgetRef ref, Sale s) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: const [
+            Icon(Icons.undo_rounded, color: Colors.red, size: 22),
+            SizedBox(width: 8),
+            Text("Reverse Payment?",
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          ],
+        ),
+        content: const Text(
+          "This will remove all recorded partial payments for this invoice.\n\n"
+          "The paid amount will be reset to SAR 0.00 and the status will return to PENDING.",
+          style: TextStyle(fontSize: 14),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text("Cancel"),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.of(ctx).pop();
+              try {
+                await ref
+                    .read(paymentsNotifierProvider.notifier)
+                    .reversePartialPayment(s.id);
+                if (context.mounted) {
+                  await ref
+                      .read(salesNotifierProvider.notifier)
+                      .fetchSaleById(s.id);
+                }
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text("Payment reversed. Invoice set to Pending."),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                        content: Text("Error: $e"),
+                        backgroundColor: Colors.red),
+                  );
+                }
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+            ),
+            child: const Text("Yes, Reverse",
+                style:
+                    TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ],
       ),
     );
   }

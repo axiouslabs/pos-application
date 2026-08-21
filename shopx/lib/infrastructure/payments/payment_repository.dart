@@ -44,6 +44,11 @@ class PaymentsRepository {
       paidAmount: paidAmount,
     );
   }
+
+  // partially_paid → pending (delete all paid records, reset balance to 0)
+  Future<Map<String, dynamic>> reversePartialPayment(int saleId) async {
+    return await api.reversePartialPayment(saleId);
+  }
 }
 
 // 🔌 Providers

@@ -64,9 +64,12 @@ exports.addPartialPayment = async ({ saleId, customerId, amount, method }) => {
     // Update sale_balance
     await repo.upsertSaleBalance(client, saleId, totalAmount, totalPaid);
 
-    // Determine payment status
+    // Determine payment status — round to 2dp to avoid floating-point drift
+    const paidRounded  = Math.round(totalPaid  * 100) / 100;
+    const totalRounded = Math.round(totalAmount * 100) / 100;
+
     let newStatus;
-    if (totalPaid >= totalAmount) {
+    if (paidRounded >= totalRounded) {
       newStatus = "paid";
     } else {
       newStatus = "partially_paid";
@@ -78,9 +81,9 @@ exports.addPartialPayment = async ({ saleId, customerId, amount, method }) => {
 
     return {
       saleId,
-      total_amount: totalAmount,
-      paid_amount: totalPaid,
-      balance: totalAmount - totalPaid,
+      total_amount: totalRounded,
+      paid_amount: paidRounded,
+      balance: Math.round((totalRounded - paidRounded) * 100) / 100,
       payment_status: newStatus,
     };
   } catch (err) {
@@ -266,6 +269,47 @@ exports.markPaymentAsPartial = async ({ saleId, paidAmount }) => {
       paid_amount: paidAmount,
       balance: totalAmount - paidAmount,
       payment_status: "partially_paid",
+    };
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
+};
+
+// ✅ Reverse partial payment → pending (delete all paid records, reset balance to 0)
+exports.reversePartialPayment = async (saleId) => {
+  const client = await db.connect();
+  try {
+    await client.query("BEGIN");
+
+    const saleRes = await client.query(
+      `SELECT total_amount FROM sales WHERE id = $1`,
+      [saleId]
+    );
+    if (!saleRes.rows[0]) throw new Error("Sale not found");
+    const totalAmount = parseFloat(saleRes.rows[0].total_amount);
+
+    // Delete all paid payment records for this sale
+    await client.query(
+      `DELETE FROM payments WHERE sale_id = $1 AND status = 'paid'`,
+      [saleId]
+    );
+
+    // Reset balance: paid = 0, balance = total
+    await repo.upsertSaleBalance(client, saleId, totalAmount, 0);
+
+    // Set sale status back to pending
+    await repo.updateSalePaymentStatus(saleId, "pending");
+
+    await client.query("COMMIT");
+    return {
+      saleId,
+      total_amount: totalAmount,
+      paid_amount: 0,
+      balance: totalAmount,
+      payment_status: "pending",
     };
   } catch (err) {
     await client.query("ROLLBACK");

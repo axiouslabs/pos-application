@@ -34,7 +34,13 @@ class _TransactionFilterDialogState extends State<TransactionFilterDialog> {
   DateTime? _toDate;
   String _status = 'ALL';
 
-  final List<String> _statusOptions = ['ALL', 'PAID', 'PENDING', 'PARTIALLY_PAID', 'VOID'];
+  final List<String> _statusOptions = [
+    'ALL',
+    'PAID',
+    'PENDING',
+    'PARTIALLY_PAID',
+    'CANCELED',
+  ];
 
   @override
   Widget build(BuildContext context) {

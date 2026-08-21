@@ -50,4 +50,10 @@ class PaymentsApi {
     );
     return res.data;
   }
+
+  // DELETE /payments/:saleId/reverse-partial  →  partially_paid → pending (paid=0)
+  Future<Map<String, dynamic>> reversePartialPayment(int saleId) async {
+    final res = await dio.delete('payments/$saleId/reverse-partial');
+    return res.data;
+  }
 }

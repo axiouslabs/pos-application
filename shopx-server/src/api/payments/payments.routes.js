@@ -12,5 +12,6 @@ router.post("/:saleId/mark-paid", validateToken, controller.markPaymentAsPaid);
 router.post("/:saleId/partial-payment", validateToken, controller.addPartialPayment);
 router.patch("/:saleId/mark-pending", validateToken, controller.markPaymentAsPending);
 router.patch("/:saleId/mark-partial", validateToken, controller.markPaymentAsPartial);
+router.delete("/:saleId/reverse-partial", validateToken, controller.reversePartialPayment);
 
 module.exports = router;

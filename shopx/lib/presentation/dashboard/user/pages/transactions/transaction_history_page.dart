@@ -29,7 +29,7 @@ class TransactionHistoryPage extends HookConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // 1. Fetch Data on Init
+    // 1. Fetch Data on Init — show cached data immediately, refresh in background
     useEffect(() {
       Future.microtask(() {
         ref.read(salesNotifierProvider.notifier).fetchMySales();
@@ -40,6 +40,9 @@ class TransactionHistoryPage extends HookConsumerWidget {
     // 2. Watch State
     final salesState = ref.watch(salesNotifierProvider);
     final sales = salesState.sales;
+
+    // Show spinner only on first load (no cached data yet)
+    final isFirstLoad = salesState.isLoading && sales.isEmpty;
 
     // // 3. Data Processing: Group by Date & Calculate Daily Totals
     // // We use useMemoized to avoid recalculating on every rebuild unless sales change
@@ -237,8 +240,8 @@ class TransactionHistoryPage extends HookConsumerWidget {
             Expanded(
               child: Builder(
                 builder: (context) {
-                  // A. LOADING
-                  if (salesState.isLoading) {
+                  // A. LOADING (only on first load — no cached data)
+                  if (isFirstLoad) {
                     return const Center(
                       child: CircularProgressIndicator(color: primaryBlue),
                     );
@@ -265,7 +268,14 @@ class TransactionHistoryPage extends HookConsumerWidget {
                   }
 
                   // D. LIST OF TRANSACTIONS
-                  return ListView.builder(
+                  return RefreshIndicator(
+                    color: primaryBlue,
+                    onRefresh: () async {
+                      await ref
+                          .read(salesNotifierProvider.notifier)
+                          .fetchMySales();
+                    },
+                    child: ListView.builder(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 20,
                       vertical: 10,
@@ -338,7 +348,8 @@ class TransactionHistoryPage extends HookConsumerWidget {
                         ],
                       );
                     },
-                  );
+                  ), // ListView.builder
+                  ); // RefreshIndicator
                 },
               ),
             ),

@@ -88,3 +88,10 @@ exports.markPaymentAsPartial = asyncHandler(async (req, res) => {
 
   res.json(result);
 });
+
+// ✅ Reverse all partial payments → back to pending (paid_amount=0, balance=total)
+exports.reversePartialPayment = asyncHandler(async (req, res) => {
+  const { saleId } = req.params;
+  const result = await service.reversePartialPayment(parseInt(saleId));
+  res.json({ message: "Partial payments reversed. Status set to PENDING.", result });
+});

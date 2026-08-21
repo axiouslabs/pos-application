@@ -101,6 +101,7 @@ class SalesNotifier extends Notifier<SalesState> {
                 discountAmount: s.discountAmount,
                 vatAmount: s.vatAmount,
                 vatPercentage: s.vatPercentage,
+                saleStatus: 'voided',
                 totalAmount: s.totalAmount,
                 paymentStatus: 'voided',
                 saleDate: s.saleDate,

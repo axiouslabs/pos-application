@@ -181,8 +181,23 @@ exports.voidSale = async (saleId, user) => {
 
     if (!sale) throw new Error("Sale not found");
 
-    if (sale.sale_status === "voided") {
-      throw new Error("Sale already voided");
+    // Check if already voided (either sale_status OR payment_status indicates void)
+    const isAlreadyVoided =
+      sale.sale_status === "voided" ||
+      sale.sale_status === "void" ||
+      sale.sale_status === "canceled" ||
+      sale.payment_status === "voided" ||
+      sale.payment_status === "void" ||
+      sale.payment_status === "canceled";
+
+    if (isAlreadyVoided) {
+      // Idempotent: ensure payment_status is also set to 'voided' for old records
+      // (records voided before the fix only had sale_status updated)
+      if (sale.payment_status !== "voided") {
+        await paymentsRepo.updateSalePaymentStatus(saleId, "voided");
+      }
+      await client.query("COMMIT");
+      return { saleId, status: "voided", alreadyVoided: true };
     }
 
     // 2️⃣ Reverse stock using sale_items
@@ -196,8 +211,9 @@ exports.voidSale = async (saleId, user) => {
       );
     }
 
-    // 3️⃣ Update sale status
+    // 3️⃣ Update sale status AND payment_status
     await repo.updateSaleStatus(client, saleId, "voided");
+    await paymentsRepo.updateSalePaymentStatus(saleId, "voided");
 
     // 4️⃣ Reverse payment
     await paymentsRepo.reversePaymentBySaleId(client, saleId);
@@ -222,7 +238,7 @@ exports.getAllSales = async () => {
 };
 
 exports.getSalesBySalesperson = async (salespersonId) => {
-  return await repo.getSalesBySalesperson(salespersonId);
+  return await repo.getSalesBySalesperson(salespersonId, 100);
 };
 
 exports.getSalesByCustomer = async (customerId) => {

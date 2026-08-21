@@ -143,7 +143,7 @@ exports.getSaleItems = async (client, saleId) => {
 
 
 // BASIC LIST
-exports.getAllSales = async (limit = 20) => {
+exports.getAllSales = async (limit = 500) => {
   const r = await db.query(
     `
     SELECT
@@ -155,13 +155,30 @@ exports.getAllSales = async (limit = 20) => {
       s.vat_percentage,
       s.total_amount,
       s.payment_status,
+      s.sale_status,
       s.sale_date,
       u.username AS salesperson_name,
       c.name AS customer_name,
-      c.phone AS customer_phone
+      c.phone AS customer_phone,
+      COALESCE(
+        json_agg(
+          json_build_object(
+            'id', p.id,
+            'sale_id', p.sale_id,
+            'customer_id', p.customer_id,
+            'amount', p.amount,
+            'method', p.method,
+            'status', p.status,
+            'created_at', p.created_at
+          ) ORDER BY p.created_at ASC
+        ) FILTER (WHERE p.id IS NOT NULL),
+        '[]'
+      ) AS payments
     FROM sales s
     LEFT JOIN users u ON u.id = s.salesperson_id
     LEFT JOIN customers c ON c.id = s.customer_id
+    LEFT JOIN payments p ON p.sale_id = s.id
+    GROUP BY s.id, u.username, c.name, c.phone
     ORDER BY s.sale_date DESC
     LIMIT $1
     `,
@@ -171,7 +188,7 @@ exports.getAllSales = async (limit = 20) => {
   return r.rows;
 };
 
-exports.getSalesBySalesperson = async (salespersonId) => {
+exports.getSalesBySalesperson = async (salespersonId, limit = 100) => {
   const r = await db.query(
     `
     SELECT
@@ -183,17 +200,35 @@ exports.getSalesBySalesperson = async (salespersonId) => {
       s.vat_percentage,
       s.total_amount,
       s.payment_status,
+      s.sale_status,
       s.sale_date,
       u.username AS salesperson_name,
       c.name AS customer_name,
-      c.phone AS customer_phone
+      c.phone AS customer_phone,
+      COALESCE(
+        json_agg(
+          json_build_object(
+            'id', p.id,
+            'sale_id', p.sale_id,
+            'customer_id', p.customer_id,
+            'amount', p.amount,
+            'method', p.method,
+            'status', p.status,
+            'created_at', p.created_at
+          ) ORDER BY p.created_at ASC
+        ) FILTER (WHERE p.id IS NOT NULL),
+        '[]'
+      ) AS payments
     FROM sales s
     LEFT JOIN users u ON u.id = s.salesperson_id
     LEFT JOIN customers c ON c.id = s.customer_id
+    LEFT JOIN payments p ON p.sale_id = s.id
     WHERE s.salesperson_id = $1
+    GROUP BY s.id, u.username, c.name, c.phone
     ORDER BY s.sale_date DESC
+    LIMIT $2
     `,
-    [salespersonId]
+    [salespersonId, limit]
   );
 
   return r.rows;
@@ -211,6 +246,7 @@ exports.getSalesByCustomer = async (customerId) => {
       s.vat_percentage,
       s.total_amount,
       s.payment_status,
+      s.sale_status,
       s.sale_date,
       u.username AS salesperson_name,
       c.name     AS customer_name,

@@ -5,19 +5,18 @@ import 'package:shopx/domain/reciept/receipt_data.dart';
 import 'package:shopx/domain/sales/sale.dart';
 import 'package:shopx/presentation/printpreview/reciept_preview_screen.dart';
 
-class TransactionDetailsDialog extends StatelessWidget {
+class TransactionDetailsDialog extends StatefulWidget {
   final Sale sale;
 
-  // upgrade actions (pending / partial → paid)
   final VoidCallback? onMarkAsPaid;
   final void Function(double amount, String method)? onRecordPayment;
 
-  // downgrade actions (paid → pending / partial)  ← NEW
   final VoidCallback? onMarkAsPending;
   final void Function(double paidAmount)? onMarkAsPartial;
 
-  // admin-only cancel
-  final VoidCallback? onVoid;
+  final VoidCallback? onReversePayment;
+
+  final Future<void> Function()? onVoid;
 
   final double? paidAmount;
   final double? balanceAmount;
@@ -29,24 +28,39 @@ class TransactionDetailsDialog extends StatelessWidget {
     this.onRecordPayment,
     this.onMarkAsPending,
     this.onMarkAsPartial,
+    this.onReversePayment,
     this.onVoid,
     this.paidAmount,
     this.balanceAmount,
   });
 
-  // ── Status helpers ────────────────────────────────────────────────────────
-  String get _status => sale.paymentStatus.toUpperCase();
+  @override
+  State<TransactionDetailsDialog> createState() =>
+      _TransactionDetailsDialogState();
+}
+
+class _TransactionDetailsDialogState extends State<TransactionDetailsDialog> {
+  String? _localStatusOverride;
+  bool _isVoiding = false;
+
+  String get _status {
+    if (_localStatusOverride != null) {
+      return _localStatusOverride!.toUpperCase();
+    }
+    return widget.sale.paymentStatus.toUpperCase();
+  }
+
   bool get _isPaid => _status == 'PAID';
   bool get _isPending => _status == 'PENDING';
   bool get _isPartiallyPaid => _status == 'PARTIALLY_PAID';
-  bool get _isVoided => _status == 'VOID' || _status == 'VOIDED';
+  bool get _isVoided =>
+      _status == 'VOID' ||
+      _status == 'VOIDED' ||
+      _status == 'CANCELED';
 
-  // show upgrade buttons for unpaid statuses
   bool get _showUpgradeActions => _isPending || _isPartiallyPaid;
-  // show downgrade buttons only when fully paid
   bool get _showDowngradeActions => _isPaid;
 
-  // ── Print preview ─────────────────────────────────────────────────────────
   void _openPrintPreview(BuildContext context) {
     final receiptData = ReceiptData(
       companyNameEn: CompanyConfig.companyNameEn,
@@ -56,11 +70,11 @@ class TransactionDetailsDialog extends StatelessWidget {
       crNumber: CompanyConfig.crNumber,
       vatNumber: CompanyConfig.vatNumber,
       mobile: CompanyConfig.mobile,
-      invoiceNumber: sale.id.toString(),
-      invoiceDate: sale.saleDate,
-      customerName: sale.customerName,
-      customerPhone: sale.customerPhone,
-      items: sale.items
+      invoiceNumber: widget.sale.id.toString(),
+      invoiceDate: widget.sale.saleDate,
+      customerName: widget.sale.customerName,
+      customerPhone: widget.sale.customerPhone,
+      items: widget.sale.items
           .map((i) => ReceiptItem(
                 nameEn: i.productName,
                 nameAr: i.productNameAr,
@@ -68,12 +82,12 @@ class TransactionDetailsDialog extends StatelessWidget {
                 quantity: i.quantity,
               ))
           .toList(),
-      subTotal: sale.subtotalAmount,
-      vatPercentage: sale.vatPercentage,
-      vatAmount: sale.vatAmount,
-      netTotal: sale.totalAmount,
-      discount: sale.discountAmount,
-      qrPayload: 'Invoice:${sale.id}',
+      subTotal: widget.sale.subtotalAmount,
+      vatPercentage: widget.sale.vatPercentage,
+      vatAmount: widget.sale.vatAmount,
+      netTotal: widget.sale.totalAmount,
+      discount: widget.sale.discountAmount,
+      qrPayload: 'Invoice:${widget.sale.id}',
     );
 
     Navigator.push(
@@ -84,7 +98,6 @@ class TransactionDetailsDialog extends StatelessWidget {
     );
   }
 
-  // ── Build ─────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     return Dialog(
@@ -97,34 +110,35 @@ class TransactionDetailsDialog extends StatelessWidget {
           children: [
             _header(context),
             const SizedBox(height: 20),
-
-            _infoRow("Customer", sale.customerName),
-            _infoRow("Phone", sale.customerPhone),
-            _infoRow("Salesperson", sale.salespersonName),
+            if (_isVoided) _readOnlyBanner(),
+            _infoRow("Customer", widget.sale.customerName),
+            _infoRow("Phone", widget.sale.customerPhone),
+            _infoRow("Salesperson", widget.sale.salespersonName),
             _infoRow(
               "Date",
-              DateFormat('dd MMM yyyy, hh:mm a').format(sale.saleDate),
+              DateFormat('dd MMM yyyy, hh:mm a').format(widget.sale.saleDate),
             ),
 
             const Divider(height: 32),
 
-            _amountRow("Subtotal", sale.subtotalAmount),
-            _amountRow("Discount", sale.discountAmount),
+            _amountRow("Subtotal", widget.sale.subtotalAmount),
+            _amountRow("Discount", widget.sale.discountAmount),
             _amountRow(
-              "VAT (${sale.vatPercentage.toStringAsFixed(0)}%)",
-              sale.vatAmount,
+              "VAT (${widget.sale.vatPercentage.toStringAsFixed(0)}%)",
+              widget.sale.vatAmount,
             ),
 
             const Divider(height: 24),
 
-            _amountRow("Total Amount", sale.totalAmount, isBold: true),
+            _amountRow("Total Amount", widget.sale.totalAmount, isBold: true),
 
-            if (_isPartiallyPaid || paidAmount != null) ...[
+            if (_isPartiallyPaid || widget.paidAmount != null) ...[
               const SizedBox(height: 8),
-              _amountRow("Paid", paidAmount ?? 0, color: Colors.green),
+              _amountRow("Paid", widget.paidAmount ?? 0, color: Colors.green),
               _amountRow(
                 "Balance Due",
-                balanceAmount ?? (sale.totalAmount - (paidAmount ?? 0)),
+                widget.balanceAmount ??
+                    (widget.sale.totalAmount - (widget.paidAmount ?? 0)),
                 color: Colors.red,
                 isBold: true,
               ),
@@ -132,22 +146,22 @@ class TransactionDetailsDialog extends StatelessWidget {
 
             const SizedBox(height: 20),
 
-            // ── Items ──────────────────────────────────────────────
             const Text(
               "Items",
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 12),
 
-            if (sale.items.isEmpty)
+            if (widget.sale.items.isEmpty)
               const Text(
                 "No items available",
                 style: TextStyle(color: Colors.grey),
               )
             else
-              ...sale.items.map((item) {
-                final unitPrice =
-                    item.quantity > 0 ? item.totalPrice / item.quantity : 0.0;
+              ...widget.sale.items.map((item) {
+                final unitPrice = item.quantity > 0
+                    ? item.totalPrice / item.quantity
+                    : 0.0;
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 12),
                   child: Column(
@@ -187,28 +201,35 @@ class TransactionDetailsDialog extends StatelessWidget {
 
             const SizedBox(height: 24),
 
-            // ── UPGRADE: pending / partial → paid ──────────────────
-            if (_showUpgradeActions) ...[
-              if (onRecordPayment != null)
+            if (_showUpgradeActions && !_isVoided) ...[
+              if (widget.onRecordPayment != null)
                 _outlinedBtn(
                   context: context,
                   label: "Record Partial Payment",
                   color: const Color(0xFF1D72D6),
                   onTap: () => _showRecordPaymentDialog(context),
                 ),
-              if (onRecordPayment != null && onMarkAsPaid != null)
+              if (widget.onRecordPayment != null) const SizedBox(height: 12),
+              if (_isPartiallyPaid && widget.onReversePayment != null) ...[
+                _outlinedBtn(
+                  context: context,
+                  label: "Reverse Payment",
+                  color: Colors.red,
+                  icon: Icons.undo_rounded,
+                  onTap: () => _confirmReversePayment(context),
+                ),
                 const SizedBox(height: 12),
-              if (onMarkAsPaid != null)
+              ],
+              if (widget.onMarkAsPaid != null)
                 _filledBtn(
                   label: "Mark as Fully Paid",
                   color: Colors.green,
-                  onTap: onMarkAsPaid!,
+                  onTap: widget.onMarkAsPaid!,
                 ),
               const SizedBox(height: 12),
             ],
 
-            // ── DOWNGRADE: paid → pending / partial ─────────────────
-            if (_showDowngradeActions) ...[
+            if (_showDowngradeActions && !_isVoided) ...[
               _sectionLabel("Adjust Payment Status"),
               const SizedBox(height: 10),
               _outlinedBtn(
@@ -229,15 +250,17 @@ class TransactionDetailsDialog extends StatelessWidget {
               const SizedBox(height: 12),
             ],
 
-            // ── Cancel Bill (admin, any non-voided status) ──────────
-            if (!_isVoided && onVoid != null) ...[
-              _outlinedBtn(
-                context: context,
-                label: "Cancel Bill",
-                color: Colors.red,
-                icon: Icons.cancel_outlined,
-                onTap: () => _showCancelConfirmation(context),
-              ),
+            if (!_isVoided && widget.onVoid != null) ...[
+              if (_isVoiding)
+                _voidingProgressBtn(context)
+              else
+                _outlinedBtn(
+                  context: context,
+                  label: "Cancel Bill",
+                  color: Colors.red,
+                  icon: Icons.cancel_outlined,
+                  onTap: () => _showCancelConfirmation(context),
+                ),
               const SizedBox(height: 4),
             ],
           ],
@@ -246,7 +269,35 @@ class TransactionDetailsDialog extends StatelessWidget {
     );
   }
 
-  // ── Header ────────────────────────────────────────────────────────────────
+  Widget _readOnlyBanner() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF3F4F6),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFFD1D5DB)),
+      ),
+      child: Row(
+        children: const [
+          Icon(Icons.lock_outline, size: 18, color: Color(0xFF6B7280)),
+          SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              "This transaction has been canceled and is now read-only.",
+              style: TextStyle(
+                fontSize: 13,
+                color: Color(0xFF6B7280),
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _header(BuildContext context) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -278,7 +329,6 @@ class TransactionDetailsDialog extends StatelessWidget {
     );
   }
 
-  // ── Info row ──────────────────────────────────────────────────────────────
   Widget _infoRow(String label, String value) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
@@ -303,7 +353,6 @@ class TransactionDetailsDialog extends StatelessWidget {
     );
   }
 
-  // ── Amount row ────────────────────────────────────────────────────────────
   Widget _amountRow(String label, double amount,
       {bool isBold = false, Color? color}) {
     return Padding(
@@ -332,7 +381,6 @@ class TransactionDetailsDialog extends StatelessWidget {
     );
   }
 
-  // ── Status chip ───────────────────────────────────────────────────────────
   Widget _statusChip() {
     Color bgColor;
     String displayText;
@@ -352,8 +400,9 @@ class TransactionDetailsDialog extends StatelessWidget {
         break;
       case 'VOID':
       case 'VOIDED':
+      case 'CANCELED':
         bgColor = const Color(0xFF9CA3AF);
-        displayText = 'VOIDED';
+        displayText = 'CANCELED';
         break;
       default:
         bgColor = const Color(0xFF1D72D6);
@@ -376,7 +425,6 @@ class TransactionDetailsDialog extends StatelessWidget {
     );
   }
 
-  // ── Section label ─────────────────────────────────────────────────────────
   Widget _sectionLabel(String text) {
     return Text(
       text,
@@ -389,37 +437,42 @@ class TransactionDetailsDialog extends StatelessWidget {
     );
   }
 
-  // ── Reusable button builders ──────────────────────────────────────────────
   Widget _outlinedBtn({
     required BuildContext context,
     required String label,
     required Color color,
-    required VoidCallback onTap,
+    required VoidCallback? onTap,
     IconData? icon,
   }) {
+    final isDisabled = onTap == null;
     return SizedBox(
       width: double.infinity,
-      child: OutlinedButton(
-        onPressed: onTap,
-        style: OutlinedButton.styleFrom(
-          padding: const EdgeInsets.symmetric(vertical: 13),
-          side: BorderSide(color: color),
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            if (icon != null) ...[
-              Icon(icon, size: 17, color: color),
-              const SizedBox(width: 6),
+      child: Opacity(
+        opacity: isDisabled ? 0.5 : 1.0,
+        child: OutlinedButton(
+          onPressed: onTap,
+          style: OutlinedButton.styleFrom(
+            padding: const EdgeInsets.symmetric(vertical: 13),
+            side: BorderSide(color: isDisabled ? Colors.grey : color),
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12)),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              if (icon != null) ...[
+                Icon(icon, size: 17, color: isDisabled ? Colors.grey : color),
+                const SizedBox(width: 6),
+              ],
+              Text(
+                label,
+                style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: isDisabled ? Colors.grey : color),
+              ),
             ],
-            Text(
-              label,
-              style: TextStyle(
-                  fontSize: 14, fontWeight: FontWeight.bold, color: color),
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -449,7 +502,43 @@ class TransactionDetailsDialog extends StatelessWidget {
     );
   }
 
-  // ── Confirm: paid → pending ───────────────────────────────────────────────
+  Widget _voidingProgressBtn(BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
+      child: OutlinedButton(
+        onPressed: null,
+        style: OutlinedButton.styleFrom(
+          padding: const EdgeInsets.symmetric(vertical: 13),
+          side: BorderSide(color: Colors.red.shade200),
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12)),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            SizedBox(
+              width: 17,
+              height: 17,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: Colors.red,
+                valueColor: AlwaysStoppedAnimation<Color>(Colors.red),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Text(
+              "Canceling Bill...",
+              style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.red.shade400),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _confirmMarkAsPending(BuildContext context) {
     showDialog(
       context: context,
@@ -470,7 +559,7 @@ class TransactionDetailsDialog extends StatelessWidget {
           ElevatedButton(
             onPressed: () {
               Navigator.of(ctx).pop();
-              onMarkAsPending?.call();
+              widget.onMarkAsPending?.call();
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFFF59E0B),
@@ -486,7 +575,6 @@ class TransactionDetailsDialog extends StatelessWidget {
     );
   }
 
-  // ── Dialog: paid → partially paid ────────────────────────────────────────
   void _showMarkAsPartialDialog(BuildContext context) {
     final controller = TextEditingController();
 
@@ -504,7 +592,7 @@ class TransactionDetailsDialog extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  "Total: SAR ${sale.totalAmount.toStringAsFixed(2)}",
+                  "Total: SAR ${widget.sale.totalAmount.toStringAsFixed(2)}",
                   style: const TextStyle(
                       fontSize: 13, color: Color(0xFF6B7280)),
                 ),
@@ -547,7 +635,7 @@ class TransactionDetailsDialog extends StatelessWidget {
                     );
                     return;
                   }
-                  if (amount >= sale.totalAmount) {
+                  if (amount >= widget.sale.totalAmount) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
                           content: Text(
@@ -556,7 +644,7 @@ class TransactionDetailsDialog extends StatelessWidget {
                     return;
                   }
                   Navigator.of(ctx).pop();
-                  onMarkAsPartial?.call(amount);
+                  widget.onMarkAsPartial?.call(amount);
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFFF97316),
@@ -574,7 +662,6 @@ class TransactionDetailsDialog extends StatelessWidget {
     );
   }
 
-  // ── Cancel bill confirmation ───────────────────────────────────────────────
   void _showCancelConfirmation(BuildContext context) {
     showDialog(
       context: context,
@@ -595,7 +682,7 @@ class TransactionDetailsDialog extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              "You are about to void Invoice #${sale.id.toString().padLeft(10, '0')}.",
+              "You are about to void Invoice #${widget.sale.id.toString().padLeft(10, '0')}.",
               style: const TextStyle(fontSize: 14),
             ),
             const SizedBox(height: 10),
@@ -619,9 +706,43 @@ class TransactionDetailsDialog extends StatelessWidget {
             child: const Text("Keep Bill"),
           ),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.of(ctx).pop();
-              onVoid?.call();
+              if (widget.onVoid != null) {
+                // ⚡ OPTIMISTIC UPDATE — apply UI change immediately so user
+                // sees CANCELED + read-only state right away, even if the
+                // backend call takes a long time (stock reversal can be slow).
+                setState(() {
+                  _localStatusOverride = 'voided';
+                  _isVoiding = true;
+                });
+                try {
+                  await widget.onVoid!();
+                  if (mounted) {
+                    setState(() {
+                      _isVoiding = false;
+                    });
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    // Roll back optimistic state on failure
+                    setState(() {
+                      _localStatusOverride = null;
+                      _isVoiding = false;
+                    });
+                    final msg = e is Exception
+                        ? e.toString().replaceFirst('Exception: ', '')
+                        : e.toString();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text("Failed to cancel bill: $msg"),
+                        backgroundColor: Colors.red,
+                        duration: const Duration(seconds: 5),
+                      ),
+                    );
+                  }
+                }
+              }
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.red,
@@ -637,10 +758,13 @@ class TransactionDetailsDialog extends StatelessWidget {
     );
   }
 
-  // ── Record Payment dialog (upgrade: pending/partial → paid) ───────────────
   void _showRecordPaymentDialog(BuildContext context) {
     final amountController = TextEditingController();
     String selectedMethod = "cash";
+
+    final alreadyPaid = widget.paidAmount ?? 0.0;
+    final remaining = widget.balanceAmount ??
+        (widget.sale.totalAmount - alreadyPaid);
 
     showDialog(
       context: context,
@@ -650,46 +774,68 @@ class TransactionDetailsDialog extends StatelessWidget {
             shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16)),
             title: const Text("Record Payment",
-                style: TextStyle(
-                    fontSize: 18, fontWeight: FontWeight.bold)),
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             content: Column(
               mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (balanceAmount != null)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 16),
-                    child: Text(
-                      "Balance due: SAR ${balanceAmount!.toStringAsFixed(2)}",
-                      style: const TextStyle(
-                          color: Colors.red,
-                          fontWeight: FontWeight.w600),
-                    ),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF3F4F6),
+                    borderRadius: BorderRadius.circular(12),
                   ),
+                  child: Column(
+                    children: [
+                      _summaryLine("Total Amount",
+                          "SAR ${widget.sale.totalAmount.toStringAsFixed(2)}",
+                          bold: true),
+                      const SizedBox(height: 4),
+                      _summaryLine("Already Paid",
+                          "SAR ${alreadyPaid.toStringAsFixed(2)}",
+                          color: Colors.green),
+                      const Divider(height: 12),
+                      _summaryLine("Remaining Balance",
+                          "SAR ${remaining.toStringAsFixed(2)}",
+                          color: Colors.red, bold: true),
+                    ],
+                  ),
+                ),
                 TextField(
                   controller: amountController,
-                  keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true),
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
                   decoration: InputDecoration(
-                    labelText: "Amount (SAR)",
-                    hintText: "Enter payment amount",
+                    labelText: "Payment Amount (SAR)",
+                    hintText: "Max: ${remaining.toStringAsFixed(2)}",
                     filled: true,
-                    fillColor: const Color(0xFFF3F4F6),
+                    fillColor: Colors.white,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none,
+                      borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
                     ),
                   ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 14),
                 DropdownButtonFormField<String>(
                   initialValue: selectedMethod,
                   decoration: InputDecoration(
                     labelText: "Payment Method",
                     filled: true,
-                    fillColor: const Color(0xFFF3F4F6),
+                    fillColor: Colors.white,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none,
+                      borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
                     ),
                   ),
                   items: const [
@@ -716,13 +862,22 @@ class TransactionDetailsDialog extends StatelessWidget {
                       double.tryParse(amountController.text.trim());
                   if (amount == null || amount <= 0) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                          content: Text("Enter a valid amount")),
+                      const SnackBar(content: Text("Enter a valid amount")),
+                    );
+                    return;
+                  }
+                  if (amount > remaining + 0.001) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                            "Amount exceeds remaining balance of SAR ${remaining.toStringAsFixed(2)}"),
+                        backgroundColor: Colors.red,
+                      ),
                     );
                     return;
                   }
                   Navigator.of(ctx).pop();
-                  onRecordPayment?.call(amount, selectedMethod);
+                  widget.onRecordPayment?.call(amount, selectedMethod);
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF1D72D6),
@@ -735,6 +890,70 @@ class TransactionDetailsDialog extends StatelessWidget {
             ],
           );
         },
+      ),
+    );
+  }
+
+  Widget _summaryLine(String label, String value,
+      {Color? color, bool bold = false}) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(label,
+            style: TextStyle(
+              fontSize: 13,
+              color: color ?? const Color(0xFF374151),
+              fontWeight: bold ? FontWeight.bold : FontWeight.normal,
+            )),
+        Text(value,
+            style: TextStyle(
+              fontSize: 13,
+              color: color ?? const Color(0xFF374151),
+              fontWeight: bold ? FontWeight.bold : FontWeight.w500,
+            )),
+      ],
+    );
+  }
+
+  void _confirmReversePayment(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: const [
+            Icon(Icons.undo_rounded, color: Colors.red, size: 22),
+            SizedBox(width: 8),
+            Text("Reverse Payment?",
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          ],
+        ),
+        content: const Text(
+          "This will remove all recorded partial payments for this invoice.\n\n"
+          "The paid amount will be reset to SAR 0.00 and the status will return to PENDING.",
+          style: TextStyle(fontSize: 14),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text("Cancel"),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              widget.onReversePayment?.call();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+            ),
+            child: const Text("Yes, Reverse",
+                style: TextStyle(
+                    color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ],
       ),
     );
   }

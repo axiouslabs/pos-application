@@ -28,7 +28,7 @@ Future<List<dynamic>> getMySales() async {
 
 // ADMIN ONLY — void / cancel a sale regardless of status
 Future<void> voidSale(int saleId) async {
-  await _dio.patch("sales/$saleId/void");
+  await _dio.post("sales/$saleId/void");
 }
 
 // ADMIN — get all sales for a specific customer

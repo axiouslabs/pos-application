@@ -23,8 +23,8 @@ class PaymentsNotifier extends Notifier<PaymentsState> {
     }
   }
 
-  // ✅ Add partial payment
-  Future<void> addPartialPayment({
+  // ✅ Add partial payment — returns the new payment_status string
+  Future<String> addPartialPayment({
     required int saleId,
     required int customerId,
     required double amount,
@@ -43,6 +43,7 @@ class PaymentsNotifier extends Notifier<PaymentsState> {
 
       final summary = PaymentSummary.fromJson(result);
       state = state.copyWith(isLoading: false, summary: summary);
+      return summary.paymentStatus; // "paid" or "partially_paid"
     } catch (e) {
       state = state.copyWith(
         isLoading: false,
@@ -94,6 +95,18 @@ class PaymentsNotifier extends Notifier<PaymentsState> {
           .markPaymentAsPartial(saleId: saleId, paidAmount: paidAmount);
       final summary = PaymentSummary.fromJson(result);
       state = state.copyWith(isLoading: false, summary: summary);
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: e.toString());
+      rethrow;
+    }
+  }
+
+  // ✅ Reverse partial payment → pending (paid=0, balance=total)
+  Future<void> reversePartialPayment(int saleId) async {
+    state = state.copyWith(isLoading: true, error: null);
+    try {
+      await ref.read(paymentsRepositoryProvider).reversePartialPayment(saleId);
+      state = state.copyWith(isLoading: false, summary: null);
     } catch (e) {
       state = state.copyWith(isLoading: false, error: e.toString());
       rethrow;

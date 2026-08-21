@@ -12,8 +12,8 @@ final dioProvider = Provider<Dio>((ref) {
     // baseUrl: "http://10.0.2.2:5050/api/", // Local backend via Android emulator
 
 
-      connectTimeout: Duration(seconds: 20),
-      receiveTimeout: Duration(seconds: 20),
+      connectTimeout: Duration(seconds: 60),
+      receiveTimeout: Duration(seconds: 60),
       headers: {
         "Content-Type": "application/json",
         //  "ngrok-skip-browser-warning": "true",
