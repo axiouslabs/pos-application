@@ -75,10 +75,37 @@ class AdminTransactionHistoryPage extends HookConsumerWidget {
           const SizedBox(width: 8),
         ],
       ),
-      body: salesState.isLoading
+      body: salesState.isLoading && salesState.sales.isEmpty
           ? const Center(child: CircularProgressIndicator())
-          : salesState.error != null
-          ? Center(child: Text(salesState.error!))
+          : salesState.sales.isEmpty && salesState.error != null
+          ? Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.wifi_off_rounded,
+                      size: 48, color: Color(0xFF9CA3AF)),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Failed to load transactions',
+                    style: TextStyle(
+                        fontSize: 16, fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Check your connection and try again.',
+                    style: TextStyle(
+                        fontSize: 13, color: Color(0xFF6B7280)),
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: () => ref
+                        .read(salesNotifierProvider.notifier)
+                        .fetchAdminSales(),
+                    child: const Text('Retry'),
+                  ),
+                ],
+              ),
+            )
           : _buildSalesList(context, ref, salesState.sales, filter.value),
     );
   }
@@ -302,12 +329,13 @@ class AdminTransactionHistoryPage extends HookConsumerWidget {
             onVoid: isVoided
                 ? null
                 : () async {
-                    try {
-                      await ref
-                          .read(salesNotifierProvider.notifier)
-                          .voidSale(sale.id);
-                    } catch (e) {
-                      rethrow;
+                    await ref
+                        .read(salesNotifierProvider.notifier)
+                        .voidSale(sale.id);
+                    // Close the details dialog on success so the
+                    // list behind it reflects the updated state.
+                    if (dialogContext.mounted) {
+                      Navigator.of(dialogContext).pop();
                     }
                     onRefresh();
                   },
@@ -344,6 +372,17 @@ class AdminTransactionHistoryPage extends HookConsumerWidget {
                     ),
                   ),
                   const SizedBox(height: 4),
+                  Text(
+                    sale.customerName,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                      color: Color(0xFF1F2937),
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
                   Text(
                     "$timeString - $trxId",
                     style: const TextStyle(

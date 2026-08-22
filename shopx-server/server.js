@@ -18,13 +18,28 @@ const userRoutes = require("./src/api/users/user.routes");
 //middleware
 app.use(
   cors({
-    origin: "*", // allow all origins (for development)
-    methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
-    // allowedHeaders: "Content-Type, Authorization",
+    origin: function (origin, callback) {
+      // Allow requests with no origin (mobile apps, curl, Postman)
+      // and any origin for the web app (configurable via CORS_ORIGIN env var)
+      const allowed = process.env.CORS_ORIGIN
+        ? process.env.CORS_ORIGIN.split(",").map((o) => o.trim())
+        : null;
+
+      if (!origin || !allowed || allowed.includes(origin) || allowed.includes("*")) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
+    methods: "GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS",
     allowedHeaders: "Content-Type, Authorization, ngrok-skip-browser-warning",
     credentials: true,
+    optionsSuccessStatus: 204,
   })
 );
+
+// Ensure preflight requests are handled before any auth middleware
+app.options("*", cors());
 
 app.use(express.json());
 app.use("/api/auth", authRoutes);

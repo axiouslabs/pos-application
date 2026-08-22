@@ -65,6 +65,19 @@ class AuthNotifier extends Notifier<AuthState> {
         return;
       }
 
+      // ── Fast path: restore user from local storage immediately ──────────
+      // This avoids a network round-trip on every startup/hot-restart so the
+      // user lands on the dashboard instantly. The token is still validated
+      // in the background via getCurrentUser.
+      final cachedUser = await _loadUser();
+      if (cachedUser != null && _accessToken != null) {
+        state = AuthState.authenticated(cachedUser);
+        // Silently refresh user data in the background; don't block the UI.
+        _refreshUserInBackground();
+        return;
+      }
+
+      // ── Slow path: no cached user — validate token over the network ─────
       if (_accessToken != null) {
         try {
           final user = await ref
@@ -72,6 +85,7 @@ class AuthNotifier extends Notifier<AuthState> {
               .getCurrentUser(_accessToken!)
               .timeout(const Duration(seconds: 4));
 
+          await _saveUser(user);
           state = AuthState.authenticated(user);
           return;
         } catch (_) {
@@ -96,11 +110,54 @@ class AuthNotifier extends Notifier<AuthState> {
     }
   }
 
-  // 🔥 LOCAL TOKEN STORAGE (SharedPreferences)
+  /// Silently fetches fresh user data after restoring from cache.
+  /// Updates state if successful; ignores network errors.
+  Future<void> _refreshUserInBackground() async {
+    if (_accessToken == null) return;
+    try {
+      final user = await ref
+          .read(authRepositoryProvider)
+          .getCurrentUser(_accessToken!)
+          .timeout(const Duration(seconds: 6));
+      await _saveUser(user);
+      if (state.isAuthenticated) {
+        state = AuthState.authenticated(user);
+      }
+    } catch (_) {
+      // Network error — keep using cached user, user stays logged in.
+    }
+  }
+
+  // 🔥 LOCAL TOKEN + USER STORAGE (SharedPreferences)
   Future<void> _saveTokens(String accessToken, String refreshToken) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString("access_token", accessToken);
     await prefs.setString("refresh_token", refreshToken);
+  }
+
+  Future<void> _saveUser(UserModel user) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt("user_id", user.id);
+    await prefs.setString("user_username", user.username);
+    await prefs.setString("user_email", user.email);
+    await prefs.setString("user_type", user.userType);
+    await prefs.setString("user_phone", user.phone);
+  }
+
+  Future<UserModel?> _loadUser() async {
+    final prefs = await SharedPreferences.getInstance();
+    final id = prefs.getInt("user_id");
+    final username = prefs.getString("user_username");
+    final userType = prefs.getString("user_type");
+    if (id == null || username == null || userType == null) return null;
+    return UserModel(
+      id: id,
+      username: username,
+      email: prefs.getString("user_email") ?? "",
+      userType: userType,
+      phone: prefs.getString("user_phone") ?? "",
+      token: "",
+    );
   }
 
   Future<void> _loadTokens() async {
@@ -113,6 +170,11 @@ class AuthNotifier extends Notifier<AuthState> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove("access_token");
     await prefs.remove("refresh_token");
+    await prefs.remove("user_id");
+    await prefs.remove("user_username");
+    await prefs.remove("user_email");
+    await prefs.remove("user_type");
+    await prefs.remove("user_phone");
   }
 
   // 🔐 LOGIN: Authenticate user with username and password
@@ -135,6 +197,7 @@ class AuthNotifier extends Notifier<AuthState> {
       _refreshToken = refreshToken;
 
       await _saveTokens(accessToken, refreshToken);
+      await _saveUser(user);
 
       state = AuthState.authenticated(user);
     } catch (e) {
@@ -160,6 +223,7 @@ class AuthNotifier extends Notifier<AuthState> {
       _refreshToken = refreshToken;
 
       await _saveTokens(accessToken, refreshToken);
+      await _saveUser(user);
 
       state = AuthState.authenticated(user);
     } catch (e) {
@@ -192,6 +256,7 @@ class AuthNotifier extends Notifier<AuthState> {
       _refreshToken = refreshToken;
 
       await _saveTokens(accessToken, refreshToken);
+      await _saveUser(user);
 
       state = AuthState.authenticated(user);
     } catch (e) {
@@ -255,6 +320,7 @@ class AuthNotifier extends Notifier<AuthState> {
       final updatedUser = await ref
           .read(authRepositoryProvider)
           .updateUser(_accessToken!, userData); // ✅ Use stored token
+      await _saveUser(updatedUser);
       state = AuthState.authenticated(updatedUser); // ✅ Keep token
     } catch (e) {
       state = state.copyWith(isLoading: false, error: e.toString());
@@ -374,6 +440,7 @@ class AuthNotifier extends Notifier<AuthState> {
       _selectedOtpMethod = null;
 
       await _saveTokens(accessToken, refreshToken);
+      await _saveUser(user);
 
       state = AuthState.authenticated(user);
 
@@ -431,9 +498,10 @@ void retryAuth() {
           .getCurrentUser(_accessToken!)
           .timeout(const Duration(seconds: 4));
 
+      await _saveUser(user);
       state = AuthState.authenticated(user);
     } catch (e) {
-      // ✅ FIX: INITIALIZATION MUST END
+      await _clearAllTokens();
       state = const AuthState.unauthenticated();
     }
   }

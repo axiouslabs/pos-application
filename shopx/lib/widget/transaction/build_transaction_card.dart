@@ -65,6 +65,17 @@ Widget buildTransactionCard(Sale sale, Color primaryBlue) {
               ),
               const SizedBox(height: 4),
               Text(
+                sale.customerName,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  color: Color(0xFF1F2937),
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 2),
+              Text(
                 "$timeString - $trxId",
                 style: const TextStyle(
                   fontSize: 12,

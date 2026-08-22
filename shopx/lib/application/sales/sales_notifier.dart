@@ -82,38 +82,51 @@ class SalesNotifier extends Notifier<SalesState> {
 
   // ADMIN — void / cancel a sale (any status)
   Future<void> voidSale(int saleId) async {
-    state = state.copyWith(isLoading: true);
     try {
       await ref.read(salesRepositoryProvider).voidSale(saleId);
-      // Remove the voided sale from the local list so the UI updates immediately
-      final updated =
-          state.sales.map((s) {
-            if (s.id == saleId) {
-              return Sale(
-                id: s.id,
-                customerId: s.customerId,
-                salespersonName: s.salespersonName,
-                customerName: s.customerName,
-                customerPhone: s.customerPhone,
-                items: s.items,
-                payments: s.payments,
-                subtotalAmount: s.subtotalAmount,
-                discountAmount: s.discountAmount,
-                vatAmount: s.vatAmount,
-                vatPercentage: s.vatPercentage,
-                saleStatus: 'voided',
-                totalAmount: s.totalAmount,
-                paymentStatus: 'voided',
-                saleDate: s.saleDate,
-              );
-            }
-            return s;
-          }).toList();
-      state = state.copyWith(isLoading: false, sales: updated);
+      // Optimistically update the local list so the UI reflects the change
+      // immediately without waiting for a full fetchAdminSales refresh.
+      final updated = state.sales.map((s) {
+        if (s.id == saleId) {
+          return Sale(
+            id: s.id,
+            customerId: s.customerId,
+            salespersonName: s.salespersonName,
+            customerName: s.customerName,
+            customerPhone: s.customerPhone,
+            items: s.items,
+            payments: s.payments,
+            subtotalAmount: s.subtotalAmount,
+            discountAmount: s.discountAmount,
+            vatAmount: s.vatAmount,
+            vatPercentage: s.vatPercentage,
+            saleStatus: 'voided',
+            totalAmount: s.totalAmount,
+            paymentStatus: 'voided',
+            saleDate: s.saleDate,
+          );
+        }
+        return s;
+      }).toList();
+      state = state.copyWith(sales: updated, error: null);
     } catch (e) {
-      state = state.copyWith(isLoading: false, error: e.toString());
-      rethrow;
+      throw Exception(_friendlyErrorMessage(e));
     }
+  }
+
+  /// Extracts a user-friendly message from a Dio or general exception,
+  /// hiding raw stack / connection details from the UI.
+  static String _friendlyErrorMessage(Object e) {
+    final raw = e.toString();
+    // DioException with null message / connection abort
+    if (raw.contains('DioException') ||
+        raw.contains('HttpException') ||
+        raw.contains('SocketException') ||
+        raw.contains('connection abort') ||
+        raw.contains('Software caused')) {
+      return 'Network error. Please check your connection and try again.';
+    }
+    return raw.replaceFirst('Exception: ', '');
   }
 
   // ADMIN — fetch all sales for a specific customer

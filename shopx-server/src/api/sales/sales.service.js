@@ -191,11 +191,11 @@ exports.voidSale = async (saleId, user) => {
       sale.payment_status === "canceled";
 
     if (isAlreadyVoided) {
-      // Idempotent: ensure payment_status is also set to 'voided' for old records
-      // (records voided before the fix only had sale_status updated)
-      if (sale.payment_status !== "voided") {
-        await paymentsRepo.updateSalePaymentStatus(saleId, "voided");
-      }
+      // Idempotent: ensure both statuses are consistent for old records
+      await client.query(
+        `UPDATE sales SET sale_status = 'voided', payment_status = 'voided' WHERE id = $1`,
+        [saleId]
+      );
       await client.query("COMMIT");
       return { saleId, status: "voided", alreadyVoided: true };
     }
@@ -211,12 +211,18 @@ exports.voidSale = async (saleId, user) => {
       );
     }
 
-    // 3️⃣ Update sale status AND payment_status
-    await repo.updateSaleStatus(client, saleId, "voided");
-    await paymentsRepo.updateSalePaymentStatus(saleId, "voided");
+    // 3️⃣ Update sale_status AND payment_status — both inside the transaction
+    await client.query(
+      `UPDATE sales SET sale_status = 'voided', payment_status = 'voided' WHERE id = $1`,
+      [saleId]
+    );
 
-    // 4️⃣ Reverse payment
-    await paymentsRepo.reversePaymentBySaleId(client, saleId);
+    // 4️⃣ Reverse ALL non-reversed payments (paid AND pending)
+    await client.query(
+      `UPDATE payments SET status = 'reversed'
+       WHERE sale_id = $1 AND status IN ('paid', 'pending')`,
+      [saleId]
+    );
 
     await client.query("COMMIT");
 
@@ -233,8 +239,8 @@ exports.voidSale = async (saleId, user) => {
 exports.getFullInvoice = async (id) => {
   return await repo.getFullInvoice(id);
 };
-exports.getAllSales = async () => {
-  return await repo.getAllSales();
+exports.getAllSales = async (limit = 500) => {
+  return await repo.getAllSales(limit);
 };
 
 exports.getSalesBySalesperson = async (salespersonId) => {
